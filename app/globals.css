@@ -122,4 +122,5 @@ a[href*="v0.dev"],
 a[href*="v0.app"],
 div[class*="built-with"],
 div[id*="built-with"] {
-display:none !important;
+  display: none !important;
+}
