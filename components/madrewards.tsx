@@ -269,15 +269,56 @@ const ThemeStyles = () => (
     }
 
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(14px); }
+      from { opacity: 0; transform: translateY(20px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    .anim-fade-up { animation: fadeUp 0.6s var(--ease) both; }
-    .anim-d-100 { animation-delay: 0.05s; }
-    .anim-d-200 { animation-delay: 0.10s; }
-    .anim-d-300 { animation-delay: 0.16s; }
-    .anim-d-400 { animation-delay: 0.22s; }
-    .anim-d-500 { animation-delay: 0.28s; }
+    .anim-fade-up { animation: fadeUp 0.9s cubic-bezier(0.2, 0.65, 0.2, 1) both; }
+    .anim-d-100 { animation-delay: 0.08s; }
+    .anim-d-200 { animation-delay: 0.18s; }
+    .anim-d-300 { animation-delay: 0.30s; }
+    .anim-d-400 { animation-delay: 0.42s; }
+    .anim-d-500 { animation-delay: 0.54s; }
+
+    /* Hero per-line reveal — each line slides up + fades with stagger */
+    @keyframes heroLine {
+      from { opacity: 0; transform: translateY(40px); filter: blur(4px); }
+      to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
+    }
+    .hero-line {
+      display: block;
+      opacity: 0;
+      animation: heroLine 1.1s cubic-bezier(0.2, 0.65, 0.2, 1) both;
+    }
+    .hero-line-1 { animation-delay: 0.15s; }
+    .hero-line-2 { animation-delay: 0.32s; }
+    .hero-line-3 { animation-delay: 0.50s; }
+
+    /* Scroll-triggered reveals (SocialTip-style) */
+    .reveal {
+      opacity: 0;
+      will-change: opacity, transform, filter;
+      transition:
+        opacity   1.1s cubic-bezier(0.2, 0.65, 0.2, 1),
+        transform 1.1s cubic-bezier(0.2, 0.65, 0.2, 1),
+        filter    1.1s cubic-bezier(0.2, 0.65, 0.2, 1);
+    }
+    .reveal-up   { transform: translateY(36px); }
+    .reveal-blur { filter: blur(14px); }
+    .reveal-fade { /* opacity only */ }
+    .reveal.is-in {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .anim-fade-up, .hero-line {
+        transition: none !important;
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+      }
+    }
 
     @keyframes shimmer {
       0%,100% { opacity: 1; }
@@ -413,21 +454,6 @@ const VideoCard = ({ creator, reward, platform, src, poster, accent }) => (
         }} />
       </div>
     )}
-
-    {/* legibility overlay */}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0 to-black/0" />
-
-    {/* Reward pill — top right */}
-    <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-[var(--accent)] text-black text-sm font-bold shadow-[0_4px_16px_-4px_rgba(0,0,0,0.4)]">
-      {reward}
-    </div>
-
-    {/* Creator badge — bottom center */}
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-      <div className="px-3 h-10 min-w-[40px] rounded-full bg-white text-black flex items-center justify-center font-display font-bold text-[11px] tracking-wider shadow-[0_4px_16px_-4px_rgba(0,0,0,0.4)]">
-        {creator}
-      </div>
-    </div>
   </div>
 );
 
@@ -440,6 +466,53 @@ const VideoCarousel = ({ videos = CREATOR_VIDEOS }) => {
         {doubled.map((v, i) => <VideoCard key={`${v.id}-${i}`} {...v} />)}
       </div>
     </div>
+  );
+};
+
+// ============================================================================
+//  SCROLL REVEAL — fades sections in as they enter the viewport
+// ============================================================================
+const useInView = (threshold = 0.15) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') { setInView(true); return; }
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setInView(true);
+        obs.unobserve(el);
+      }
+    }, { threshold, rootMargin: '0px 0px -8% 0px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, inView] as const;
+};
+
+const Reveal = ({
+  children,
+  variant = 'up',
+  delay = 0,
+  className = '',
+  as: Tag = 'div',
+}: {
+  children: React.ReactNode;
+  variant?: 'up' | 'blur' | 'fade';
+  delay?: number;
+  className?: string;
+  as?: any;
+}) => {
+  const [ref, inView] = useInView();
+  return (
+    <Tag
+      ref={ref}
+      className={`reveal reveal-${variant} ${inView ? 'is-in' : ''} ${className}`}
+      style={{ transitionDelay: inView ? `${delay}ms` : '0ms' }}
+    >
+      {children}
+    </Tag>
   );
 };
 
@@ -474,22 +547,22 @@ const LandingPage = ({ go, theme, setTheme }) => {
             Invite-only creator program
           </div>
 
-          <h1 className="anim-fade-up anim-d-100 font-display font-extrabold text-[22vw] sm:text-[120px] md:text-[160px] lg:text-[184px] leading-[0.86] tracking-[-0.04em]">
-            Post.<br />
-            Earn.<br />
-            <span className="text-[var(--accent)]">Repeat.</span>
+          <h1 className="font-display font-extrabold text-[22vw] sm:text-[120px] md:text-[160px] lg:text-[184px] leading-[0.86] tracking-[-0.04em]">
+            <span className="hero-line hero-line-1">Post.</span>
+            <span className="hero-line hero-line-2">Earn.</span>
+            <span className="hero-line hero-line-3 text-[var(--accent)]">Repeat.</span>
           </h1>
 
-          <p className="anim-fade-up anim-d-200 mt-8 md:mt-10 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
+          <p className="anim-fade-up anim-d-400 mt-8 md:mt-10 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
             Post content. Hit goals. Earn rewards weekly.
           </p>
 
-          <div className="anim-fade-up anim-d-300 mt-10 flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="anim-fade-up anim-d-500 mt-10 flex flex-col sm:flex-row gap-3 justify-center">
             <Btn size="lg" onClick={() => go('signup')} iconRight={ArrowRight}>Sign Up Request</Btn>
             <Btn size="lg" variant="outline" onClick={() => go('login')} icon={Lock}>Invite Code</Btn>
           </div>
 
-          <div className="anim-fade-up anim-d-400 mt-12 flex items-center justify-center gap-6 text-xs text-[var(--text-dim)]">
+          <div className="anim-fade-up anim-d-500 mt-12 flex items-center justify-center gap-6 text-xs text-[var(--text-dim)]" style={{ animationDelay: '0.66s' }}>
             <span className="flex items-center gap-2"><Music2 size={14} strokeWidth={2.2} /> TikTok</span>
             <span className="flex items-center gap-2"><Instagram size={14} strokeWidth={2.2} /> Instagram Reels</span>
             <span className="hidden sm:flex items-center gap-2"><Shield size={14} strokeWidth={2.2} /> Vetted creators only</span>
@@ -498,56 +571,60 @@ const LandingPage = ({ go, theme, setTheme }) => {
       </header>
 
       {/* CREATOR VIDEO CAROUSEL — scrolling row of vertical cards */}
-      <section className="relative pb-24 md:pb-32 anim-fade-up anim-d-500">
+      <Reveal variant="up" as="section" className="relative pb-24 md:pb-32">
         <div className="text-center mb-10 px-5">
           <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Live from creators</span>
         </div>
         <VideoCarousel />
-      </section>
+      </Reveal>
 
       {/* HOW IT WORKS */}
       <section className="relative px-5 md:px-10 pb-28 md:pb-32 max-w-6xl mx-auto">
-        <div className="mb-12 md:mb-14 text-center">
+        <Reveal variant="up" className="mb-12 md:mb-14 text-center">
           <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">How it works</span>
           <h2 className="font-display font-bold text-3xl md:text-5xl mt-3 tracking-tight">Four steps to the payout.</h2>
-        </div>
+        </Reveal>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {steps.map((s, i) => (
-            <Card key={s.n} interactive className={`p-6 md:p-7 anim-fade-up anim-d-${(i + 1) * 100}`}>
-              <div className="flex items-center justify-between mb-10">
-                <span className="font-mono text-xs text-[var(--text-dim)] font-medium">{s.n}</span>
-                <div className="w-10 h-10 rounded-xl bg-[var(--elev2)] flex items-center justify-center text-[var(--accent)]">
-                  <s.icon size={17} strokeWidth={2.2} />
+            <Reveal key={s.n} variant="up" delay={i * 90}>
+              <Card interactive className="p-6 md:p-7">
+                <div className="flex items-center justify-between mb-10">
+                  <span className="font-mono text-xs text-[var(--text-dim)] font-medium">{s.n}</span>
+                  <div className="w-10 h-10 rounded-xl bg-[var(--elev2)] flex items-center justify-center text-[var(--accent)]">
+                    <s.icon size={17} strokeWidth={2.2} />
+                  </div>
                 </div>
-              </div>
-              <h3 className="font-display font-bold text-xl mb-2.5">{s.title}</h3>
-              <p className="text-sm text-[var(--text-dim)] leading-relaxed">{s.desc}</p>
-            </Card>
+                <h3 className="font-display font-bold text-xl mb-2.5">{s.title}</h3>
+                <p className="text-sm text-[var(--text-dim)] leading-relaxed">{s.desc}</p>
+              </Card>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* FEATURED REWARD */}
       <section className="relative px-5 md:px-10 pb-28 md:pb-32 max-w-6xl mx-auto">
-        <Card className="relative overflow-hidden p-8 md:p-12">
-          <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full glow-accent" />
-          <div className="relative grid md:grid-cols-[1fr_auto] gap-8 items-end">
-            <div>
-              <Badge status="active">This week</Badge>
-              <h3 className="font-display font-bold text-3xl md:text-5xl mt-5 tracking-tight">Launch Week Sprint</h3>
-              <p className="mt-4 text-[var(--text-dim)] max-w-md leading-relaxed">Hit the brief, hit 5k views in 72 hours, walk with $250. Top performer this week earns a $500 bonus.</p>
+        <Reveal variant="up">
+          <Card className="relative overflow-hidden p-8 md:p-12">
+            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full glow-accent" />
+            <div className="relative grid md:grid-cols-[1fr_auto] gap-8 items-end">
+              <div>
+                <Badge status="active">This week</Badge>
+                <h3 className="font-display font-bold text-3xl md:text-5xl mt-5 tracking-tight">Launch Week Sprint</h3>
+                <p className="mt-4 text-[var(--text-dim)] max-w-md leading-relaxed">Hit the brief, hit 5k views in 72 hours, walk with $250. Top performer this week earns a $500 bonus.</p>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-xs text-[var(--text-dim)] font-medium">UP TO</span>
+                <span className="font-display font-extrabold text-5xl md:text-7xl text-[var(--accent)] leading-none">$750</span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-xs text-[var(--text-dim)] font-medium">UP TO</span>
-              <span className="font-display font-extrabold text-5xl md:text-7xl text-[var(--accent)] leading-none">$750</span>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </Reveal>
       </section>
 
       {/* FOOTER */}
-      <footer className="relative px-5 md:px-10 py-10 border-t border-[var(--border)] max-w-6xl mx-auto">
+      <Reveal variant="blur" as="footer" className="relative px-5 md:px-10 py-10 border-t border-[var(--border)] max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Logo small />
@@ -557,7 +634,7 @@ const LandingPage = ({ go, theme, setTheme }) => {
             Admin sign-in
           </button>
         </div>
-      </footer>
+      </Reveal>
     </div>
   );
 };
