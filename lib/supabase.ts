@@ -14,7 +14,7 @@ import { createClient } from '@supabase/supabase-js'
 // ============================================================
 
 // Your confirmed-good project URL (the one that loads manually).
-const KNOWN_GOOD_URL = 'https://cgzpmvinxsyaezndhklk.supabase.co'
+const KNOWN_GOOD_URL = 'https://cgzpmvinxysaezndhklk.supabase.co'
 
 // Flip to true to bypass the env entirely and force the known URL.
 // Decisive A/B test: if true fixes the fetch, your env var is the problem.
