@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Sparkles, ArrowRight, ArrowUpRight, Check, X, Clock, DollarSign,
@@ -9,12 +11,40 @@ import {
   Shield, Layers, Inbox, Wallet, ChevronLeft, Edit3, Trash2,
   Link as LinkIcon, FileText, Tag
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // =============================================================================
 //  MAD REWARDS — Influencer rewards portal
-//  Single-file React app. All data is mocked; swap the service layer for
-//  Supabase/Firebase calls when wiring to backend.
+//  Wired to Supabase: signup -> creators, video submit -> video_submissions,
+//  Recent submissions loaded live. Campaigns remain local (no campaigns table).
 // =============================================================================
+
+// Map a video_submissions row (snake_case) onto the camelCase shape the
+// existing UI already reads (sub.url, sub.submittedAt, sub.payout, etc.).
+const mapSubmissionRow = (r) => ({
+  id: r.id,
+  creatorId: r.creator_id,
+  campaignId: null,           // no campaign column in this model
+  url: r.video_url,
+  platform: r.platform,
+  status: r.status,
+  submittedAt: r.created_at,
+  payout: Number(r.reward_amount) || 0,
+  views: r.views ?? 0,
+  paid: !!r.paid,
+  notes: '',
+});
+
+// Map a creators row onto the shape the UI uses for the signed-in creator.
+const mapCreatorRow = (r) => ({
+  id: r.id,
+  name: r.name,
+  email: r.email,
+  tiktok: r.tiktok_handle,
+  instagram: r.instagram_handle,
+  status: r.status,
+  joined: r.created_at,
+});
 
 // ────────────────────────── MOCK DATA ──────────────────────────
 const initialCampaigns = [
@@ -651,19 +681,22 @@ const AuthPage = ({ mode, go, onLogin, onSignup, creators }) => {
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     setError('');
     if (tab === 'login') {
       const u = creators.find((c) => c.email.toLowerCase() === form.email.toLowerCase() && c.password === form.password);
-      if (!u) { setError('No creator found with that email/password. Try maya@example.com / demo'); return; }
+      if (!u) { setError('No creator found with that email/password.'); return; }
       onLogin(u);
     } else {
       const required = ['name', 'email', 'phone', 'tiktok', 'instagram', 'password'];
       const missing = required.find((k) => !form[k]);
       if (missing) { setError('All fields required.'); return; }
-      if (creators.some((c) => c.email.toLowerCase() === form.email.toLowerCase())) { setError('Email already registered.'); return; }
-      onSignup(form);
+      try {
+        await onSignup(form);
+      } catch (err) {
+        setError(err?.message || 'Could not create account. Try again.');
+      }
     }
   };
 
@@ -956,16 +989,27 @@ const SubmitForm = ({ user, campaigns, onSubmit }) => {
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id || '');
   const [url, setUrl] = useState('');
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { if (!campaignId && campaigns[0]) setCampaignId(campaigns[0].id); }, [campaigns, campaignId]);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!url || !campaignId) return;
-    onSubmit({ creatorId: user.id, campaignId, url, platform: detectPlatform(url) });
-    setUrl('');
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 2400);
+    setError('');
+    setSuccess(false);
+    setSubmitting(true);
+    try {
+      await onSubmit({ creatorId: user.id, campaignId, url, platform: detectPlatform(url) });
+      setUrl('');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2400);
+    } catch (err) {
+      setError(err?.message || 'Could not submit your link. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (campaigns.length === 0) return null;
@@ -1013,8 +1057,9 @@ const SubmitForm = ({ user, campaigns, onSubmit }) => {
             </div>
           )}
           <div className="flex items-center gap-3 ml-auto">
+            {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
             {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted</span>}
-            <Btn type="submit" disabled={!url || !campaignId} iconRight={ArrowRight}>Submit</Btn>
+            <Btn type="submit" disabled={!url || !campaignId || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit'}</Btn>
           </div>
         </div>
       </form>
@@ -1614,26 +1659,72 @@ const App = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [theme, setTheme] = useState('dark');
 
-  const [creators, setCreators] = useState(initialCreators);
+  const [creators, setCreators] = useState([]);
   const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [submissions, setSubmissions] = useState(initialSubmissions);
+  const [submissions, setSubmissions] = useState([]);
 
-  // ─── SERVICE LAYER (swap for API calls when wiring backend) ───
-  const handleLogin = (creator) => { setUser(creator); setView('dash'); };
-  const handleSignup = (form) => {
-    const newCreator = { ...form, id: uid('usr'), joined: new Date().toISOString().slice(0, 10) };
-    setCreators((cs) => [...cs, newCreator]);
-    setUser(newCreator);
-    setView('dash');
+  // ─── SUPABASE SERVICE LAYER ───
+  // Recent submissions + creators load live. Campaigns stay local (no table).
+  const loadSubmissions = async () => {
+    const { data, error } = await supabase
+      .from('video_submissions')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setSubmissions(data.map(mapSubmissionRow));
   };
+
+  useEffect(() => {
+    (async () => {
+      const [subs, crs] = await Promise.all([
+        supabase.from('video_submissions').select('*').order('created_at', { ascending: false }),
+        supabase.from('creators').select('*').order('created_at', { ascending: false }),
+      ]);
+      if (!subs.error && subs.data) setSubmissions(subs.data.map(mapSubmissionRow));
+      if (!crs.error && crs.data) setCreators(crs.data.map(mapCreatorRow));
+    })();
+  }, []);
+
+  const handleLogin = (creator) => { setUser(creator); setView('dash'); };
+
+  // Insert into creators. Throws on failure so AuthPage can show the message.
+  const handleSignup = async (form) => {
+    const { data, error } = await supabase
+      .from('creators')
+      .insert({
+        name: form.name,
+        email: form.email.trim().toLowerCase(),
+        tiktok_handle: form.tiktok || null,
+        instagram_handle: form.instagram || null,
+      })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') throw new Error('That email is already registered.');
+      throw new Error(error.message || 'Signup failed.');
+    }
+    const creator = mapCreatorRow(data);
+    setCreators((cs) => [creator, ...cs]);
+    setUser(creator);
+    setView('dash');
+    await loadSubmissions();
+  };
+
   const handleAdminLogin = () => { setIsAdmin(true); setView('a-dash'); };
   const handleLogout = () => { setUser(null); setIsAdmin(false); setView('landing'); };
 
-  const handleNewSubmission = (data) => {
-    const sub = { ...data, id: uid('sub'), submittedAt: new Date().toISOString().slice(0, 10), status: 'pending', notes: '', payout: campaigns.find((c) => c.id === data.campaignId)?.reward || 0 };
-    setSubmissions((s) => [sub, ...s]);
+  // Insert into video_submissions. status/views/paid/reward_amount default in DB.
+  // Throws on failure so SubmitForm can show the real error.
+  const handleNewSubmission = async (data) => {
+    const { error } = await supabase.from('video_submissions').insert({
+      creator_id: data.creatorId,
+      video_url: data.url,
+      platform: data.platform,
+    });
+    if (error) throw new Error(error.message || 'Could not save your submission.');
+    await loadSubmissions();
   };
 
+  // Admin write-backs stay local until the protected admin route exists.
   const updateStatus = (id, status) => {
     setSubmissions((subs) => subs.map((s) => s.id === id ? { ...s, status } : s));
   };
