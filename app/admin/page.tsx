@@ -1,162 +1,141 @@
 'use client'
 
-// ⚠️ NO ACCESS CONTROL. As written, anyone who finds /admin can read every
-// creator and edit every submission, because it runs on the public anon key.
-// Before this is reachable in production, gate it (see GO_LIVE notes / the
-// "Securing admin" section). This file is the functional dashboard only.
+import { useState } from 'react'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import type { Creator, VideoSubmission } from '@/lib/types'
+type Creator = { id: string; name: string; email: string; status: string }
+type Submission = {
+  id: string; creator_id: string; video_url: string; platform: string
+  status: string; views: number; paid: boolean; reward_amount: number
+}
 
-const STATUS_OPTIONS = ['pending', 'approved', 'rejected', 'paid']
+const STATUS = ['pending', 'approved', 'rejected', 'paid']
 
-export default function AdminDashboard() {
+export default function AdminPage() {
+  const [password, setPassword] = useState('')
+  const [authed, setAuthed] = useState(false)
   const [creators, setCreators] = useState<Creator[]>([])
-  const [submissions, setSubmissions] = useState<VideoSubmission[]>([])
-  const [loading, setLoading] = useState(true)
+  const [submissions, setSubmissions] = useState<Submission[]>([])
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const load = async () => {
-    setLoading(true)
-    const [c, v] = await Promise.all([
-      supabase.from('creators').select('*').order('created_at', { ascending: false }),
-      supabase.from('video_submissions').select('*').order('created_at', { ascending: false }),
-    ])
-    if (c.error || v.error) setError(c.error?.message || v.error?.message || 'Load failed.')
-    setCreators((c.data as Creator[]) ?? [])
-    setSubmissions((v.data as VideoSubmission[]) ?? [])
-    setLoading(false)
+  const call = async (payload: object) => {
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, ...payload }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Request failed')
+    return data
   }
 
-  useEffect(() => { load() }, [])
-
-  // Optimistic update, then persist. Reverts via reload on error.
-  const updateSubmission = async (id: string, patch: Partial<VideoSubmission>) => {
-    setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
-    const { error } = await supabase.from('video_submissions').update(patch).eq('id', id)
-    if (error) { setError(error.message); load() }
+  const login = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(''); setLoading(true)
+    try {
+      const data = await call({ action: 'list' })
+      setCreators(data.creators ?? [])
+      setSubmissions(data.submissions ?? [])
+      setAuthed(true)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const emailFor = (creatorId: string) =>
-    creators.find((c) => c.id === creatorId)?.email ?? '—'
+  const update = async (id: string, patch: Partial<Submission>) => {
+    setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s))) // optimistic
+    try {
+      await call({ action: 'update', id, patch })
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
 
-  if (loading) return <div className="p-8 text-sm text-neutral-500">Loading…</div>
+  const emailFor = (cid: string) => creators.find((c) => c.id === cid)?.email ?? '—'
+
+  if (!authed) {
+    return (
+      <main style={{ maxWidth: 360, margin: '120px auto', fontFamily: 'system-ui, sans-serif' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Admin</h1>
+        <form onSubmit={login}>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginBottom: 10 }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', padding: 10, borderRadius: 8, background: '#000', color: '#fff', fontWeight: 600 }}
+          >
+            {loading ? 'Checking…' : 'Enter'}
+          </button>
+        </form>
+        {error && <p style={{ color: 'crimson', fontSize: 14, marginTop: 10 }}>{error}</p>}
+      </main>
+    )
+  }
+
+  const cell: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid #eee', fontSize: 14 }
+  const head: React.CSSProperties = { ...cell, textAlign: 'left', fontSize: 12, color: '#666', textTransform: 'uppercase' }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-12 p-6 md:p-10">
-      {error && (
-        <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-      )}
+    <main style={{ maxWidth: 1000, margin: '40px auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' }}>
+      {error && <p style={{ color: 'crimson', fontSize: 14 }}>{error}</p>}
 
-      {/* CREATORS */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-bold">Creators ({creators.length})</h2>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">Email</th>
-                <th className="p-3">TikTok</th>
-                <th className="p-3">Instagram</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {creators.map((c) => (
-                <tr key={c.id}>
-                  <td className="p-3 font-medium">{c.name}</td>
-                  <td className="p-3 text-neutral-600">{c.email}</td>
-                  <td className="p-3 text-neutral-600">{c.tiktok_handle ?? '—'}</td>
-                  <td className="p-3 text-neutral-600">{c.instagram_handle ?? '—'}</td>
-                  <td className="p-3 capitalize">{c.status}</td>
-                </tr>
-              ))}
-              {creators.length === 0 && (
-                <tr><td colSpan={5} className="p-4 text-center text-neutral-400">No creators yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '24px 0 12px' }}>Creators ({creators.length})</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr><th style={head}>Name</th><th style={head}>Email</th><th style={head}>Status</th></tr></thead>
+        <tbody>
+          {creators.map((c) => (
+            <tr key={c.id}>
+              <td style={cell}>{c.name}</td><td style={cell}>{c.email}</td><td style={cell}>{c.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-      {/* SUBMISSIONS */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-bold">Video submissions ({submissions.length})</h2>
-        <div className="overflow-x-auto rounded-lg border border-neutral-200">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
-              <tr>
-                <th className="p-3">Creator</th>
-                <th className="p-3">Video</th>
-                <th className="p-3">Platform</th>
-                <th className="p-3">Views</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Reward ($)</th>
-                <th className="p-3">Paid</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {submissions.map((s) => (
-                <tr key={s.id}>
-                  <td className="p-3 text-neutral-600">{emailFor(s.creator_id)}</td>
-                  <td className="p-3 max-w-[180px]">
-                    <a href={s.video_url} target="_blank" rel="noreferrer" className="block truncate text-blue-600 hover:underline">
-                      {s.video_url}
-                    </a>
-                  </td>
-                  <td className="p-3 capitalize text-neutral-600">{s.platform}</td>
-                  <td className="p-3">
-                    <input
-                      type="number"
-                      defaultValue={s.views}
-                      onBlur={(e) => {
-                        const views = Number(e.target.value)
-                        if (views !== s.views) updateSubmission(s.id, { views })
-                      }}
-                      className="w-24 rounded border border-neutral-300 px-2 py-1"
-                    />
-                  </td>
-                  <td className="p-3">
-                    <select
-                      value={s.status}
-                      onChange={(e) => updateSubmission(s.id, { status: e.target.value })}
-                      className="rounded border border-neutral-300 px-2 py-1 capitalize"
-                    >
-                      {STATUS_OPTIONS.map((o) => (
-                        <option key={o} value={o} className="capitalize">{o}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="number"
-                      defaultValue={s.reward_amount}
-                      onBlur={(e) => {
-                        const reward_amount = Number(e.target.value)
-                        if (reward_amount !== s.reward_amount) updateSubmission(s.id, { reward_amount })
-                      }}
-                      className="w-24 rounded border border-neutral-300 px-2 py-1"
-                    />
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="checkbox"
-                      checked={s.paid}
-                      onChange={(e) => updateSubmission(s.id, { paid: e.target.checked })}
-                      className="h-4 w-4"
-                    />
-                  </td>
-                </tr>
-              ))}
-              {submissions.length === 0 && (
-                <tr><td colSpan={7} className="p-4 text-center text-neutral-400">No submissions yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '32px 0 12px' }}>Submissions ({submissions.length})</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={head}>Creator</th><th style={head}>Video</th><th style={head}>Views</th>
+            <th style={head}>Status</th><th style={head}>Reward $</th><th style={head}>Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          {submissions.map((s) => (
+            <tr key={s.id}>
+              <td style={cell}>{emailFor(s.creator_id)}</td>
+              <td style={{ ...cell, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <a href={s.video_url} target="_blank" rel="noreferrer">{s.video_url}</a>
+              </td>
+              <td style={cell}>
+                <input type="number" defaultValue={s.views}
+                  onBlur={(e) => { const v = Number(e.target.value); if (v !== s.views) update(s.id, { views: v }) }}
+                  style={{ width: 80, padding: 4 }} />
+              </td>
+              <td style={cell}>
+                <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })}>
+                  {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </td>
+              <td style={cell}>
+                <input type="number" defaultValue={s.reward_amount}
+                  onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }}
+                  style={{ width: 80, padding: 4 }} />
+              </td>
+              <td style={cell}>
+                <input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
   )
 }
