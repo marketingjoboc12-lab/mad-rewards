@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 type Creator = {
   id: string; name: string; email: string
+  phone: string | null; cashapp: string | null
   tiktok_handle: string | null; instagram_handle: string | null
   status: string; created_at: string
 }
@@ -35,6 +36,16 @@ const DEFAULT_TIERS: Tier[] = [
 const fmtDate = (s: string) => { if (!s) return '—'; try { return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return s } }
 const money = (n: number) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 const num = (n: number) => (Number(n) || 0).toLocaleString()
+const parseV = (raw: string) => {
+  if (raw == null) return 0
+  let s = String(raw).trim().toLowerCase().replace(/,/g, '').replace(/\s/g, '')
+  if (!s) return 0
+  let mult = 1
+  if (s.endsWith('m')) { mult = 1_000_000; s = s.slice(0, -1) }
+  else if (s.endsWith('k')) { mult = 1_000; s = s.slice(0, -1) }
+  const n = parseFloat(s)
+  return isNaN(n) ? 0 : Math.round(n * mult)
+}
 const toUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`)
 
 // tiny inline icons (no external deps)
@@ -55,6 +66,7 @@ const Ico = {
   ticket: 'M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4zM13 5v2M13 17v2M13 11v2',
   inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
   copy: 'M20 9H11a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
+  chev: 'M9 18l6-6-6-6',
 }
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -79,6 +91,7 @@ export default function AdminPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [tab, setTab] = useState<'overview' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
   const [copied, setCopied] = useState('')
+  const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
 
   const call = async (payload: object) => {
     const res = await fetch('/api/admin', {
@@ -205,6 +218,29 @@ export default function AdminPage() {
   const paidOut = submissions.filter((s) => s.paid).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
   const owed = submissions.filter((s) => !s.paid && (s.status === 'approved' || s.status === 'paid')).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
   const activeCampaign = campaigns.find((c) => c.active)
+
+  // group submissions by creator + compute stats
+  const dayKey = (s: Submission) => (s.posted_at || s.created_at || '').slice(0, 10)
+  const subGroups = (() => {
+    const map = new Map<string, Submission[]>()
+    for (const s of submissions) {
+      const arr = map.get(s.creator_id) || []
+      arr.push(s); map.set(s.creator_id, arr)
+    }
+    const groups = Array.from(map.entries()).map(([cid, entries]) => {
+      const sorted = [...entries].sort((a, b) => dayKey(b).localeCompare(dayKey(a)))
+      const totalClaimed = entries.reduce((a, s) => a + (Number(s.claimed_views) || 0), 0)
+      const days = new Set(entries.map(dayKey).filter(Boolean))
+      const distinctDays = days.size
+      const dates = entries.map((s) => new Date(s.posted_at || s.created_at).getTime()).filter((t) => !isNaN(t))
+      const first = dates.length ? Math.min(...dates) : Date.now()
+      const daysSinceFirst = Math.max(0, Math.floor((Date.now() - first) / 86400000))
+      const c = creators.find((x) => x.id === cid)
+      return { cid, c, entries: sorted, count: entries.length, totalClaimed, distinctDays, daysSinceFirst }
+    })
+    // creators with most recent activity first
+    return groups.sort((a, b) => dayKey(b.entries[0]).localeCompare(dayKey(a.entries[0])))
+  })()
 
   const pendingReqs = requests.filter((r) => r.status === 'pending').length
   const unusedInvites = invites.filter((i) => !i.used).length
@@ -433,66 +469,91 @@ export default function AdminPage() {
         {tab === 'creators' && (
           <div className="card table-scroll">
             <table className="tbl">
-              <thead><tr><th>Name</th><th>Email</th><th>TikTok</th><th>Instagram</th><th>Status</th><th>Joined</th></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Cash App</th><th>TikTok</th><th>Instagram</th><th>Status</th><th>Joined</th></tr></thead>
               <tbody>
                 {creators.map((c) => (
                   <tr key={c.id}>
                     <td style={{ fontWeight: 600 }}>{c.name}</td>
                     <td className="muted">{c.email}</td>
+                    <td>{c.phone || '—'}</td>
+                    <td>{c.cashapp || '—'}</td>
                     <td>{c.tiktok_handle || '—'}</td>
                     <td>{c.instagram_handle || '—'}</td>
                     <td><span className={`pill ${c.status}`}>{c.status}</span></td>
                     <td className="muted">{fmtDate(c.created_at)}</td>
                   </tr>
                 ))}
-                {creators.length === 0 && <tr><td className="empty" colSpan={6}>No creators yet.</td></tr>}
+                {creators.length === 0 && <tr><td className="empty" colSpan={8}>No creators yet.</td></tr>}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* ===== SUBMISSIONS ===== */}
+        {/* ===== SUBMISSIONS (grouped by creator) ===== */}
         {tab === 'submissions' && (
-          <div className="card table-scroll">
-            <table className="tbl">
-              <thead><tr>
-                <th>Creator</th><th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th><th>Reward</th><th>Paid</th>
-              </tr></thead>
-              <tbody>
-                {submissions.map((s) => {
-                  const c = creatorFor(s.creator_id)
-                  return (
-                    <tr key={s.id}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{c?.name || '—'}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>{c?.email || s.creator_id.slice(0, 8)}</div>
-                      </td>
-                      <td style={{ maxWidth: 200 }}>
-                        <a href={toUrl(s.video_url)} target="_blank" rel="noreferrer" className="link ellipsis">{s.video_url}</a>
-                      </td>
-                      <td className="muted" style={{ textTransform: 'capitalize' }}>{s.platform}</td>
-                      <td className="muted">{s.posted_at ? fmtDate(s.posted_at) : '—'}</td>
-                      <td className="muted">{fmtDate(s.created_at)}</td>
-                      <td className="muted">{num(s.claimed_views || 0)}</td>
-                      <td><input type="number" defaultValue={s.views} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
-                      <td>
-                        <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
-                          {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span className="muted">$</span>
-                          <input type="number" defaultValue={s.reward_amount} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }} />
-                        </div>
-                      </td>
-                      <td><input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} className="chk" /></td>
-                    </tr>
-                  )
-                })}
-                {submissions.length === 0 && <tr><td className="empty" colSpan={10}>No submissions yet.</td></tr>}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {subGroups.map((g) => {
+              const open = !!openSubs[g.cid]
+              return (
+                <div key={g.cid} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {/* creator summary row */}
+                  <button
+                    onClick={() => setOpenSubs((p) => ({ ...p, [g.cid]: !p[g.cid] }))}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 16, padding: '16px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'inherit' }}
+                  >
+                    <span style={{ transition: 'transform .2s', transform: open ? 'rotate(90deg)' : 'none', display: 'inline-flex', color: 'var(--accent)' }}><Icon d={Ico.chev} size={16} /></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{g.c?.name || 'Unknown creator'}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{g.c?.email || g.cid.slice(0, 8)}</div>
+                    </div>
+                    <span className="pill approved" style={{ flexShrink: 0 }}>+{g.count} {g.count === 1 ? 'entry' : 'entries'}</span>
+                    <div className="sub-stats">
+                      <div><div className="ss-val">{num(g.totalClaimed)}</div><div className="ss-lab">Claimed views</div></div>
+                      <div><div className="ss-val">{g.distinctDays}</div><div className="ss-lab">Days posted</div></div>
+                      <div><div className="ss-val">{g.daysSinceFirst}</div><div className="ss-lab">Days in</div></div>
+                    </div>
+                  </button>
+
+                  {/* expanded entries */}
+                  {open && (
+                    <div className="table-scroll" style={{ borderTop: '1px solid var(--line)' }}>
+                      <table className="tbl">
+                        <thead><tr>
+                          <th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th><th>Reward</th><th>Paid</th>
+                        </tr></thead>
+                        <tbody>
+                          {g.entries.map((s) => (
+                            <tr key={s.id}>
+                              <td style={{ maxWidth: 200 }}>
+                                <a href={toUrl(s.video_url)} target="_blank" rel="noreferrer" className="link ellipsis">{s.video_url}</a>
+                              </td>
+                              <td className="muted" style={{ textTransform: 'capitalize' }}>{s.platform}</td>
+                              <td className="muted">{s.posted_at ? fmtDate(s.posted_at) : '—'}</td>
+                              <td className="muted">{fmtDate(s.created_at)}</td>
+                              <td className="muted">{num(s.claimed_views || 0)}</td>
+                              <td><input type="text" inputMode="decimal" defaultValue={s.views ? String(s.views) : ''} placeholder="e.g. 1.2m" className="input sm" onBlur={(e) => { const v = parseV(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
+                              <td>
+                                <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
+                                  {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span className="muted">$</span>
+                                  <input type="number" defaultValue={s.reward_amount} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }} />
+                                </div>
+                              </td>
+                              <td><input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} className="chk" /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {subGroups.length === 0 && <div className="card"><div className="empty">No submissions yet.</div></div>}
           </div>
         )}
 
@@ -756,8 +817,12 @@ select.input{cursor:pointer}
 .ic-sky{background:linear-gradient(135deg,#7dd3fc,#0284c7)}
 .tile-val{font-family:'Fredoka',sans-serif;font-size:26px;font-weight:700;line-height:1}
 .tile-lab{font-size:13px;color:var(--dim);margin-top:3px;font-weight:600}
+.sub-stats{display:flex;gap:26px;flex-shrink:0;padding-left:8px}
+.sub-stats > div{text-align:right;min-width:74px}
+.ss-val{font-family:'Fredoka',sans-serif;font-size:20px;font-weight:700;line-height:1;color:var(--accent)}
+.ss-lab{font-size:11px;color:var(--dim);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 
-@media (max-width:760px){ .feature-grid{grid-template-columns:1fr} .hero-ico{display:none} .hero-h{font-size:30px} }
+@media (max-width:760px){ .feature-grid{grid-template-columns:1fr} .hero-ico{display:none} .hero-h{font-size:30px} .sub-stats{gap:14px} .sub-stats > div{min-width:0} .ss-lab{display:none} }
 
 @media (max-width:860px){
   .madx{flex-direction:column}
