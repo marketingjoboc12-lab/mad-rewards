@@ -9,7 +9,7 @@ import {
   CheckCircle2, XCircle, CircleDot, Banknote, ExternalLink,
   Hash, Zap, Award, BarChart3, Eye, Heart, Music2, Instagram,
   Shield, Layers, Inbox, Wallet, ChevronLeft, Edit3, Trash2,
-  Link as LinkIcon, FileText, Tag, Ticket
+  Link as LinkIcon, FileText, Tag, Ticket, Gift, Package
 } from 'lucide-react';
 import { supabase, SUPABASE_URL_IN_USE } from '@/lib/supabase';
 
@@ -147,6 +147,28 @@ const detectPlatform = (url) => {
 const daysLeft = (endDate) => {
   const ms = new Date(endDate) - new Date();
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+};
+
+// Parse loose view input: "1.2m" -> 1200000, "400k" -> 400000, "1,200,000" -> 1200000, "48200" -> 48200
+const parseViews = (raw) => {
+  if (raw == null) return 0;
+  let s = String(raw).trim().toLowerCase().replace(/,/g, '').replace(/\s/g, '');
+  if (!s) return 0;
+  let mult = 1;
+  if (s.endsWith('m')) { mult = 1_000_000; s = s.slice(0, -1); }
+  else if (s.endsWith('k')) { mult = 1_000; s = s.slice(0, -1); }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : Math.round(n * mult);
+};
+
+// Pick an icon that fits a reward tier
+const tierIcon = (label) => {
+  const l = (label || '').toLowerCase();
+  if (l.includes('device') || l.includes('mega')) return Zap;
+  if (l.includes('bag') || l.includes('duffle')) return Award;
+  if (l.includes('product') || l.includes('re-up') || l.includes('reup')) return Gift;
+  if (l.includes('$') || /\d/.test(l)) return Banknote;
+  return Trophy;
 };
 
 // ────────────────────────── PRIMITIVES ──────────────────────────
@@ -750,7 +772,7 @@ const InvitePage = ({ go, onValid }) => {
 };
 
 const SignupPage = ({ go, code, onSignup }) => {
-  const [form, setForm] = useState({ name: '', email: '', password: '', tiktok: '', instagram: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', cashapp: '', password: '', tiktok: '', instagram: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -772,6 +794,10 @@ const SignupPage = ({ go, code, onSignup }) => {
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => up('name', e.target.value)} />
         <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={form.email} onChange={(e) => up('email', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Phone" icon={Phone} type="tel" placeholder="+1 555 000 0000" value={form.phone} onChange={(e) => up('phone', e.target.value)} />
+          <Field label="Cash App" icon={DollarSign} placeholder="$yourcashtag" value={form.cashapp} onChange={(e) => up('cashapp', e.target.value)} />
+        </div>
         <Field label="Password" icon={Lock} type="password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
@@ -1015,66 +1041,89 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
         </div>
       </div>
 
-      {/* ── REWARDS CALCULATOR ── */}
+      {/* ── REWARDS ── */}
       {deal ? (
-        <Card className="relative overflow-hidden p-8 md:p-12 anim-fade-up anim-d-200">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent" />
-          <div className="relative">
-            <Badge status="active">{deal.cadence === 'monthly' ? "This month's rewards" : "This week's rewards"}</Badge>
-            <h2 className="font-display font-extrabold text-3xl md:text-5xl mt-5 tracking-tight">{deal.title}</h2>
+        <div className="anim-fade-up anim-d-200">
+          {/* progress header */}
+          <Card className="relative overflow-hidden p-7 md:p-10">
+            <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
+            <div className="relative">
+              <Badge status="active">{deal.cadence === 'monthly' ? 'This month' : 'This week'}</Badge>
+              <h2 className="font-display font-extrabold text-3xl md:text-5xl mt-5 tracking-tight">{deal.title}</h2>
 
-            <div className="mt-8 grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your videos</div>
-                <div className="font-display font-bold text-3xl md:text-4xl">{videoCount}</div>
+              <div className="mt-7 grid grid-cols-2 gap-4 max-w-md">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your views</div>
+                  <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(totalViews)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your videos</div>
+                  <div className="font-display font-bold text-3xl md:text-4xl">{videoCount}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your combined views</div>
-                <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(totalViews)}</div>
-              </div>
-            </div>
 
-            <div className="mt-8 p-6 rounded-2xl" style={{ background: 'linear-gradient(135deg,#bef264,#84cc16 50%,#4d9b0f)', color: '#10240a' }}>
-              <div className="text-[11px] uppercase tracking-[0.12em] font-bold opacity-70 mb-1.5">You've unlocked</div>
-              <div className="font-display font-extrabold text-3xl">{current ? current.reward_label : 'Nothing yet — keep posting'}</div>
-              {next ? (
-                <>
-                  <div className="mt-4 text-sm font-medium opacity-90">
-                    Next: <span className="font-bold">{next.reward_label}</span> — {nf(viewsToNext)} more views
-                    {videosToNext != null && <> or {videosToNext} more videos</>}
+              {/* the one clear sentence */}
+              <div className="mt-7">
+                {current && (
+                  <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--accent)] text-black font-bold text-sm mb-4">
+                    <Check size={15} strokeWidth={3} /> You've earned {current.reward_label}
                   </div>
-                  <div className="mt-3 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(16,36,10,0.18)' }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'rgba(16,36,10,0.7)' }} />
-                  </div>
-                </>
-              ) : (
-                <div className="mt-4 text-sm font-bold">Top tier reached. 🎉</div>
-              )}
-            </div>
-
-            {/* tier ladder */}
-            <div className="mt-8 space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-2">All tiers</div>
-              {tiers.map((t, i) => {
-                const hit = qualifies(t);
-                const isCurrent = i === currentIdx;
-                return (
-                  <div key={i} className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border ${isCurrent ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : hit ? 'border-[var(--border)] bg-[var(--elev2)]' : 'border-[var(--border)] bg-[var(--elev1)] opacity-70'}`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${hit ? 'bg-[var(--accent)]' : 'bg-[var(--elev2)] border border-[var(--border)]'}`}>
-                        {hit ? <Check size={12} strokeWidth={3} className="text-black" /> : <Lock size={10} className="text-[var(--text-faint)]" />}
-                      </span>
-                      <span className="text-sm font-semibold">{t.reward_label}</span>
+                )}
+                {next ? (
+                  <>
+                    <div className="text-lg md:text-xl font-semibold">
+                      {nf(viewsToNext)} more views{videosToNext != null && <> (or {videosToNext} more videos)</>} to unlock <span className="text-[var(--accent)]">{next.reward_label}</span>
                     </div>
-                    <span className="text-xs text-[var(--text-dim)] text-right">
-                      {t.videos != null && <>{t.videos} videos / </>}{nf(t.views)} views
-                    </span>
-                  </div>
-                );
-              })}
+                    <div className="mt-4 h-3 rounded-full bg-[var(--elev2)] overflow-hidden">
+                      <div className="h-full bg-[var(--accent)] rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-lg md:text-xl font-bold text-[var(--accent)]">🎉 You've reached the top reward. Incredible.</div>
+                )}
+              </div>
             </div>
+          </Card>
+
+          {/* reward ladder */}
+          <div className="mt-6 space-y-3">
+            {tiers.map((t, i) => {
+              const hit = qualifies(t);
+              const isNext = i === currentIdx + 1;
+              const Ico = tierIcon(t.reward_label);
+              return (
+                <div
+                  key={i}
+                  className={`reward-step group flex items-center gap-4 p-4 md:p-5 rounded-2xl border transition-all duration-300
+                    ${hit
+                      ? 'border-[var(--accent)] shadow-[0_8px_30px_-12px_var(--accent)]'
+                      : isNext
+                        ? 'border-[var(--accent)]/40 bg-[var(--elev1)]'
+                        : 'border-[var(--border)] bg-[var(--elev1)] opacity-60'}`}
+                  style={hit ? { background: 'linear-gradient(135deg, var(--accent-soft), transparent)' } : undefined}
+                >
+                  <span
+                    className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all
+                      ${hit ? 'bg-[var(--accent)] text-black scale-100' : isNext ? 'bg-[var(--elev2)] text-[var(--accent)] pulse-soft' : 'bg-[var(--elev2)] text-[var(--text-faint)]'}`}
+                  >
+                    {hit ? <Check size={22} strokeWidth={3} /> : <Ico size={20} />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-display font-bold text-lg md:text-xl">{t.reward_label}</span>
+                      {hit && <span className="text-[10px] uppercase tracking-wide font-bold text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 rounded-full">Unlocked</span>}
+                      {isNext && <span className="text-[10px] uppercase tracking-wide font-bold text-[var(--text-dim)] border border-[var(--border)] px-2 py-0.5 rounded-full">Next up</span>}
+                    </div>
+                    <div className="text-sm text-[var(--text-dim)] mt-0.5">
+                      {t.videos != null ? <>{t.videos} videos or {nf(t.views)} views</> : <>{nf(t.views)} views</>}
+                    </div>
+                  </div>
+                  {!hit && <Lock size={16} className="text-[var(--text-faint)] flex-shrink-0" />}
+                </div>
+              );
+            })}
           </div>
-        </Card>
+        </div>
       ) : (
         <Card className="p-8 text-center anim-fade-up anim-d-200">
           <p className="text-sm text-[var(--text-dim)]">No active campaign right now. Check back soon.</p>
@@ -1133,7 +1182,7 @@ const SubmitForm = ({ user, onSubmit }) => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const ready = url && postedAt && claimedViews !== '';
+  const ready = url && postedAt && parseViews(claimedViews) > 0;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1142,7 +1191,7 @@ const SubmitForm = ({ user, onSubmit }) => {
     setSuccess(false);
     setSubmitting(true);
     try {
-      await onSubmit({ creatorId: user.id, url, platform, postedAt, claimedViews: Number(claimedViews) || 0 });
+      await onSubmit({ creatorId: user.id, url, platform, postedAt, claimedViews: parseViews(claimedViews) });
       setUrl(''); setPostedAt(''); setClaimedViews('');
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2400);
@@ -1212,13 +1261,16 @@ const SubmitForm = ({ user, onSubmit }) => {
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Views on this video</label>
             <input
-              type="number"
-              min="0"
-              placeholder="e.g. 48200"
+              type="text"
+              inputMode="decimal"
+              placeholder="e.g. 48200, 400k, 1.2m"
               value={claimedViews}
               onChange={(e) => setClaimedViews(e.target.value)}
               className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
             />
+            {claimedViews && parseViews(claimedViews) > 0 && (
+              <p className="text-[11px] text-[var(--accent)] mt-1.5 font-semibold">= {parseViews(claimedViews).toLocaleString()} views</p>
+            )}
             <p className="text-[11px] text-[var(--text-faint)] mt-2 leading-snug">
               All data is verified. Submitting false info means losing access to the program.
             </p>
@@ -1911,6 +1963,8 @@ const App = () => {
         name: form.name,
         email: (form.email || '').trim().toLowerCase(),
         password: form.password,
+        phone: form.phone || null,
+        cashapp: form.cashapp || null,
         tiktok: form.tiktok || null,
         instagram: form.instagram || null,
       }),
