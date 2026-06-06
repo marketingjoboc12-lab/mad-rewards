@@ -9,7 +9,7 @@ import {
   CheckCircle2, XCircle, CircleDot, Banknote, ExternalLink,
   Hash, Zap, Award, BarChart3, Eye, Heart, Music2, Instagram,
   Shield, Layers, Inbox, Wallet, ChevronLeft, Edit3, Trash2,
-  Link as LinkIcon, FileText, Tag
+  Link as LinkIcon, FileText, Tag, Ticket
 } from 'lucide-react';
 import { supabase, SUPABASE_URL_IN_USE } from '@/lib/supabase';
 
@@ -563,122 +563,116 @@ const Reveal = ({
 // ============================================================================
 //  LANDING
 // ============================================================================
-const LandingPage = ({ go, theme, setTheme }) => {
-  const steps = [
-    { n: '01', title: 'Sign up',           desc: 'Create your creator profile with your TikTok and Instagram handles.', icon: UserIcon },
-    { n: '02', title: 'Post the content',   desc: 'Pick a weekly challenge, hit the brief, and post to TikTok or Reels.', icon: Music2 },
-    { n: '03', title: 'Submit your link',   desc: 'Drop the URL in your dashboard. We track views and engagement.',     icon: Upload },
-    { n: '04', title: 'Get paid',           desc: 'Hit the goal, get approved, get paid out. Simple.',                   icon: Wallet },
-  ];
+const REWARD_TEASERS = {
+  week: [
+    { tag: 'Re-up', label: 'Free product restock', sub: 'Stay active, keep posting' },
+    { tag: '$100', label: 'Cash reward', sub: 'Hit the weekly view goal' },
+    { tag: '$200', label: 'Cash reward', sub: 'Push past the next tier' },
+  ],
+  month: [
+    { tag: '$300', label: 'Cash reward', sub: 'Monthly reach milestone' },
+    { tag: '$350 + bag', label: 'Cash + MAD duffle bag', sub: 'Top creators only' },
+    { tag: '$350 + device', label: 'Cash + Mega device', sub: 'Hit the big numbers' },
+  ],
+};
 
+const BlurReward = ({ t }) => (
+  <Card className="relative overflow-hidden p-6 select-none min-h-[140px]">
+    <div className="pointer-events-none blur-[7px] opacity-80">
+      <div className="font-display font-extrabold text-3xl text-[var(--accent)]">{t.tag}</div>
+      <div className="font-semibold mt-2">{t.label}</div>
+      <div className="text-sm text-[var(--text-dim)] mt-1">{t.sub}</div>
+    </div>
+    <div className="absolute inset-0 flex items-center justify-center">
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--elev1)]/90 border border-[var(--border)] px-3 py-1.5 rounded-full backdrop-blur-sm">
+        <Lock size={12} /> Members only
+      </span>
+    </div>
+  </Card>
+);
+
+const LandingPage = ({ go, theme, setTheme }) => {
   return (
     <div className="relative z-10">
-      {/* NAV — slim, two-tier max */}
+      {/* NAV — login stays top-right */}
       <nav className="relative z-20 px-5 md:px-10 py-5 md:py-6 flex items-center justify-between max-w-7xl mx-auto">
         <Logo />
         <div className="flex items-center gap-2">
           <ThemeToggle theme={theme} setTheme={setTheme} />
-          <Btn variant="ghost" size="sm" onClick={() => go('login')}>Login</Btn>
+          <Btn variant="ghost" size="sm" onClick={() => go('login')}>Log in</Btn>
         </div>
       </nav>
 
-      {/* HERO — centered */}
-      <header className="relative px-5 md:px-10 pt-12 md:pt-20 pb-16 md:pb-24 max-w-5xl mx-auto text-center">
+      {/* HERO */}
+      <header className="relative px-5 md:px-10 pt-10 md:pt-16 pb-10 md:pb-12 max-w-5xl mx-auto text-center">
         <div className="absolute inset-0 glow-accent pointer-events-none" />
         <div className="relative">
           <div className="anim-fade-up inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--elev1)] text-xs text-[var(--text-dim)] mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] pulse-soft" />
             Invite-only creator program
           </div>
-
-          <h1 className="font-display font-extrabold text-[22vw] sm:text-[120px] md:text-[160px] lg:text-[184px] leading-[0.86] tracking-[-0.04em]">
+          <h1 className="font-display font-extrabold text-[20vw] sm:text-[104px] md:text-[148px] leading-[0.86] tracking-[-0.04em]">
             <span className="hero-line hero-line-1">Post.</span>
             <span className="hero-line hero-line-2">Earn.</span>
             <span className="hero-line hero-line-3 text-[var(--accent)]">Repeat.</span>
           </h1>
-
-          <p className="anim-fade-up anim-d-400 mt-8 md:mt-10 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
-            Post content. Hit goals. Earn rewards weekly.
+          <p className="anim-fade-up anim-d-400 mt-8 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
+            Post content. Hit goals. Earn rewards every week. Mad Rewards is invite-only.
           </p>
-
-          <div className="anim-fade-up anim-d-500 mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-            <Btn size="lg" onClick={() => go('signup')} iconRight={ArrowRight}>Sign Up Request</Btn>
-            <Btn size="lg" variant="outline" onClick={() => go('login')} icon={Lock}>Invite Code</Btn>
-          </div>
-
-          <div className="anim-fade-up anim-d-500 mt-12 flex items-center justify-center gap-6 text-xs text-[var(--text-dim)]" style={{ animationDelay: '0.66s' }}>
-            <span className="flex items-center gap-2"><Music2 size={14} strokeWidth={2.2} /> TikTok</span>
-            <span className="flex items-center gap-2"><Instagram size={14} strokeWidth={2.2} /> Instagram Reels</span>
-            <span className="hidden sm:flex items-center gap-2"><Shield size={14} strokeWidth={2.2} /> Vetted creators only</span>
-          </div>
         </div>
       </header>
 
-      {/* CREATOR VIDEO CAROUSEL — scrolling row of vertical cards */}
-      <Reveal variant="up" as="section" className="relative pb-24 md:pb-32">
-        <div className="text-center mb-10 px-5">
-          <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Live from creators</span>
-        </div>
-        <VideoCarousel />
-      </Reveal>
-
-      {/* HOW IT WORKS */}
-      <section className="relative px-5 md:px-10 pb-28 md:pb-32 max-w-6xl mx-auto">
-        <Reveal variant="up" className="mb-12 md:mb-14 text-center">
-          <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">How it works</span>
-          <h2 className="font-display font-bold text-3xl md:text-5xl mt-3 tracking-tight">Four steps to the payout.</h2>
-        </Reveal>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {steps.map((s, i) => (
-            <Reveal key={s.n} variant="up" delay={i * 90}>
-              <Card interactive className="p-6 md:p-7">
-                <div className="flex items-center justify-between mb-10">
-                  <span className="font-mono text-xs text-[var(--text-dim)] font-medium">{s.n}</span>
-                  <div className="w-10 h-10 rounded-xl bg-[var(--elev2)] flex items-center justify-center text-[var(--accent)]">
-                    <s.icon size={17} strokeWidth={2.2} />
-                  </div>
-                </div>
-                <h3 className="font-display font-bold text-xl mb-2.5">{s.title}</h3>
-                <p className="text-sm text-[var(--text-dim)] leading-relaxed">{s.desc}</p>
-              </Card>
-            </Reveal>
-          ))}
+      {/* TWO DOORS */}
+      <section className="relative px-5 md:px-10 pb-16 md:pb-20 max-w-3xl mx-auto">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Card interactive onClick={() => go('invite')} className="p-7 text-center cursor-pointer">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] text-black flex items-center justify-center mx-auto mb-4"><Ticket size={20} /></div>
+            <h3 className="font-display font-bold text-xl">Have an invite code?</h3>
+            <p className="text-sm text-[var(--text-dim)] mt-2">Enter your one-time code and set up your account.</p>
+            <div className="mt-5"><Btn className="w-full" iconRight={ArrowRight}>Enter code</Btn></div>
+          </Card>
+          <Card interactive onClick={() => go('request')} className="p-7 text-center cursor-pointer">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--elev2)] text-[var(--accent)] flex items-center justify-center mx-auto mb-4"><Mail size={20} /></div>
+            <h3 className="font-display font-bold text-xl">Want in?</h3>
+            <p className="text-sm text-[var(--text-dim)] mt-2">Request an invite. If you're a fit, we'll send you a code.</p>
+            <div className="mt-5"><Btn variant="outline" className="w-full" iconRight={ArrowRight}>Request an invite</Btn></div>
+          </Card>
         </div>
       </section>
 
-      {/* FEATURED REWARD */}
-      <section className="relative px-5 md:px-10 pb-28 md:pb-32 max-w-6xl mx-auto">
-        <Reveal variant="up">
-          <Card className="relative overflow-hidden p-8 md:p-12">
-            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full glow-accent" />
-            <div className="relative grid md:grid-cols-[1fr_auto] gap-8 items-end">
-              <div>
-                <Badge status="active">This week</Badge>
-                <h3 className="font-display font-bold text-3xl md:text-5xl mt-5 tracking-tight">Launch Week Sprint</h3>
-                <p className="mt-4 text-[var(--text-dim)] max-w-md leading-relaxed">Hit the brief, hit 5k views in 72 hours, walk with $250. Top performer this week earns a $500 bonus.</p>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-xs text-[var(--text-dim)] font-medium">UP TO</span>
-                <span className="font-display font-extrabold text-5xl md:text-7xl text-[var(--accent)] leading-none">$750</span>
-              </div>
-            </div>
-          </Card>
-        </Reveal>
+      {/* BLURRED — THIS WEEK */}
+      <section className="relative px-5 md:px-10 pb-14 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-display font-bold text-2xl md:text-3xl tracking-tight">Active rewards — this week</h2>
+          <Badge status="active">Live</Badge>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {REWARD_TEASERS.week.map((t, i) => <BlurReward key={i} t={t} />)}
+        </div>
+      </section>
+
+      {/* BLURRED — THIS MONTH */}
+      <section className="relative px-5 md:px-10 pb-24 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-display font-bold text-2xl md:text-3xl tracking-tight">Active rewards — this month</h2>
+          <Badge status="active">Live</Badge>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {REWARD_TEASERS.month.map((t, i) => <BlurReward key={i} t={t} />)}
+        </div>
+        <p className="text-center text-sm text-[var(--text-dim)] mt-8">Sign in to unlock the full reward ladder and track your progress.</p>
       </section>
 
       {/* FOOTER */}
-      <Reveal variant="blur" as="footer" className="relative px-5 md:px-10 py-10 border-t border-[var(--border)] max-w-6xl mx-auto">
+      <footer className="relative px-5 md:px-10 py-10 border-t border-[var(--border)] max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Logo small />
             <span className="text-xs text-[var(--text-dim)]">© 2026 MAD Intelligence</span>
           </div>
-          <button onClick={() => go('admin-login')} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-dim)]">
-            Admin sign-in
-          </button>
+          <a href="/admin" className="text-xs text-[var(--text-faint)] hover:text-[var(--text-dim)]">Admin</a>
         </div>
-      </Reveal>
+      </footer>
     </div>
   );
 };
@@ -686,99 +680,152 @@ const LandingPage = ({ go, theme, setTheme }) => {
 // ============================================================================
 //  AUTH — Sign Up / Login (creator) and Admin Login
 // ============================================================================
-const AuthPage = ({ mode, go, onLogin, onSignup, creators }) => {
-  const [tab, setTab] = useState(mode); // 'login' | 'signup'
-  const [form, setForm] = useState({ name: '', email: '', phone: '', tiktok: '', instagram: '', password: '' });
-  const [error, setError] = useState('');
-
-  useEffect(() => setTab(mode), [mode]);
-
-  const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (tab === 'login') {
-      const u = creators.find((c) => c.email.toLowerCase() === form.email.toLowerCase() && c.password === form.password);
-      if (!u) { setError('No creator found with that email/password.'); return; }
-      onLogin(u);
-    } else {
-      const required = ['name', 'email', 'phone', 'tiktok', 'instagram', 'password'];
-      const missing = required.find((k) => !form[k]);
-      if (missing) { setError('All fields required.'); return; }
-      try {
-        await onSignup(form);
-      } catch (err) {
-        setError(err?.message || 'Could not create account. Try again.');
-      }
-    }
-  };
-
-  return (
-    <div className="relative z-10 min-h-screen flex flex-col">
-      <nav className="px-5 md:px-10 py-6 flex items-center justify-between max-w-7xl mx-auto w-full">
-        <button onClick={() => go('landing')} className="flex items-center gap-1.5 text-[var(--text-dim)] hover:text-[var(--text)] -ml-1 h-9 px-3 rounded-full hover:bg-[var(--elev1)]">
-          <ChevronLeft size={16} />
-          <span className="text-sm font-semibold">Back</span>
-        </button>
-        <Logo small />
-      </nav>
-
-      <div className="flex-1 flex items-center justify-center px-5 py-10">
-        <div className="w-full max-w-md anim-fade-up">
-          <div className="text-center mb-10">
-            <h1 className="font-display font-extrabold text-4xl md:text-5xl tracking-tight">
-              {tab === 'login' ? 'Welcome back.' : 'Join Mad Rewards.'}
-            </h1>
-            <p className="mt-4 text-sm text-[var(--text-dim)]">
-              {tab === 'login' ? 'Log in to see this week\'s challenge.' : 'Set up your creator profile in under a minute.'}
-            </p>
-          </div>
-
-          <div className="flex gap-1 p-1 rounded-full bg-[var(--elev1)] border border-[var(--border)] mb-6">
-            {['login', 'signup'].map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError(''); }}
-                className={`flex-1 h-10 rounded-full text-sm font-semibold ${tab === t ? 'bg-[var(--accent)] text-black shadow-[0_4px_16px_-4px_var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}
-              >
-                {t === 'login' ? 'Login' : 'Sign up'}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={submit} className="space-y-4">
-            {tab === 'signup' && (
-              <>
-                <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => update('name', e.target.value)} />
-                <Field label="Phone" icon={Phone} placeholder="+1 415 555 0142" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => update('tiktok', e.target.value)} />
-                  <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => update('instagram', e.target.value)} />
-                </div>
-              </>
-            )}
-            <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={form.email} onChange={(e) => update('email', e.target.value)} />
-            <Field label="Password" icon={Lock} type="password" placeholder="••••••••" value={form.password} onChange={(e) => update('password', e.target.value)} />
-
-            {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
-
-            <div className="pt-2">
-              <Btn type="submit" size="lg" className="w-full" iconRight={ArrowRight}>
-                {tab === 'login' ? 'Login' : 'Create my account'}
-              </Btn>
-            </div>
-          </form>
-
-          {tab === 'login' && (
-            <div className="mt-6 p-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-xs text-[var(--text-dim)]">
-              <div className="font-semibold text-[var(--text)] mb-1">Demo logins</div>
-              Try <span className="font-mono text-[var(--accent)]">maya@example.com</span> / <span className="font-mono">demo</span>
-            </div>
-          )}
-        </div>
-      </div>
+const AuthFrame = ({ go, back = 'landing', children }) => (
+  <div className="relative z-10 min-h-screen flex flex-col">
+    <nav className="px-5 md:px-10 py-6 flex items-center justify-between max-w-7xl mx-auto w-full">
+      <button onClick={() => go(back)} className="flex items-center gap-1.5 text-[var(--text-dim)] hover:text-[var(--text)] -ml-1 h-9 px-3 rounded-full hover:bg-[var(--elev1)]">
+        <ChevronLeft size={16} /><span className="text-sm font-semibold">Back</span>
+      </button>
+      <Logo small />
+    </nav>
+    <div className="flex-1 flex items-center justify-center px-5 py-8">
+      <div className="w-full max-w-md anim-fade-up">{children}</div>
     </div>
+  </div>
+);
+
+const LoginPage = ({ go, onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await onLogin({ email, password }); }
+    catch (err) { setError(err?.message || 'Could not log in.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <AuthFrame go={go}>
+      <div className="text-center mb-8">
+        <h1 className="font-display font-extrabold text-4xl md:text-5xl tracking-tight">Welcome back.</h1>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">Log in to see this week's challenge.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label="Password" icon={Lock} type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+        {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
+        <div className="pt-2"><Btn type="submit" size="lg" className="w-full" disabled={busy} iconRight={ArrowRight}>{busy ? 'Logging in…' : 'Log in'}</Btn></div>
+      </form>
+      <p className="text-center text-sm text-[var(--text-dim)] mt-6">Have an invite code? <button onClick={() => go('invite')} className="text-[var(--accent)] font-semibold">Sign up</button></p>
+    </AuthFrame>
+  );
+};
+
+const InvitePage = ({ go, onValid }) => {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setBusy(true);
+    try { await onValid(code.trim().toUpperCase()); }
+    catch (err) { setError(err?.message || 'That code is not valid.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <AuthFrame go={go}>
+      <div className="text-center mb-8">
+        <div className="w-14 h-14 rounded-2xl bg-[var(--accent)] text-black flex items-center justify-center mx-auto mb-5"><Ticket size={24} /></div>
+        <h1 className="font-display font-extrabold text-4xl tracking-tight">Enter your invite.</h1>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">This is a <span className="text-[var(--text)] font-semibold">one-time-use invite code</span>, just for you. Please don't share it.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Invite code" icon={Ticket} placeholder="MAD-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value)} />
+        {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
+        <div className="pt-2"><Btn type="submit" size="lg" className="w-full" disabled={busy} iconRight={ArrowRight}>{busy ? 'Checking…' : 'Continue'}</Btn></div>
+      </form>
+      <p className="text-center text-sm text-[var(--text-dim)] mt-6">No code? <button onClick={() => go('request')} className="text-[var(--accent)] font-semibold">Request an invite</button></p>
+    </AuthFrame>
+  );
+};
+
+const SignupPage = ({ go, code, onSignup }) => {
+  const [form, setForm] = useState({ name: '', email: '', password: '', tiktok: '', instagram: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const submit = async (e) => {
+    e.preventDefault(); setError('');
+    if (!form.name || !form.email || !form.password) { setError('Name, email and password are required.'); return; }
+    if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setBusy(true);
+    try { await onSignup({ ...form, code }); }
+    catch (err) { setError(err?.message || 'Could not create your account.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <AuthFrame go={go} back="invite">
+      <div className="text-center mb-8">
+        <h1 className="font-display font-extrabold text-4xl tracking-tight">Create your account.</h1>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">Invite <span className="font-mono text-[var(--accent)]">{code}</span> accepted. Set up your profile.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => up('name', e.target.value)} />
+        <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={form.email} onChange={(e) => up('email', e.target.value)} />
+        <Field label="Password" icon={Lock} type="password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
+          <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} />
+        </div>
+        {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
+        <div className="pt-2"><Btn type="submit" size="lg" className="w-full" disabled={busy} iconRight={ArrowRight}>{busy ? 'Creating…' : 'Create my account'}</Btn></div>
+      </form>
+    </AuthFrame>
+  );
+};
+
+const RequestPage = ({ go, onSubmit }) => {
+  const [form, setForm] = useState({ name: '', email: '', tiktok: '', instagram: '', note: '' });
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const submit = async (e) => {
+    e.preventDefault(); setError('');
+    if (!form.name || !form.email) { setError('Name and email are required.'); return; }
+    setBusy(true);
+    try { await onSubmit(form); setDone(true); }
+    catch (err) { setError(err?.message || 'Could not send your request.'); }
+    finally { setBusy(false); }
+  };
+  if (done) return (
+    <AuthFrame go={go}>
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[var(--accent)] text-black flex items-center justify-center mx-auto mb-5"><Check size={26} strokeWidth={3} /></div>
+        <h1 className="font-display font-extrabold text-4xl tracking-tight">Request sent.</h1>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">If you're a fit, we'll send a one-time invite code to your email. Keep an eye out.</p>
+        <div className="mt-7"><Btn variant="outline" onClick={() => go('landing')}>Back home</Btn></div>
+      </div>
+    </AuthFrame>
+  );
+  return (
+    <AuthFrame go={go}>
+      <div className="text-center mb-8">
+        <h1 className="font-display font-extrabold text-4xl tracking-tight">Request an invite.</h1>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">Tell us about you. Mad Rewards is invite-only — we approve creators who fit.</p>
+      </div>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => up('name', e.target.value)} />
+        <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={form.email} onChange={(e) => up('email', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
+          <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} />
+        </div>
+        <Textarea label="Your pitch" placeholder="Audience size, what you post, why you're a fit…" value={form.note} onChange={(e) => up('note', e.target.value)} />
+        {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
+        <div className="pt-2"><Btn type="submit" size="lg" className="w-full" disabled={busy} iconRight={ArrowRight}>{busy ? 'Sending…' : 'Send request'}</Btn></div>
+      </form>
+    </AuthFrame>
   );
 };
 
@@ -1779,6 +1826,7 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [inviteCode, setInviteCode] = useState('');
 
   const [creators, setCreators] = useState([]);
   const [campaigns, setCampaigns] = useState(initialCampaigns);
@@ -1813,38 +1861,79 @@ const App = () => {
     })();
   }, []);
 
-  const handleLogin = (creator) => { setUser(creator); setView('dash'); };
+  // Restore a logged-in session on load (real Supabase Auth accounts).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sUser = data?.session?.user;
+        if (sUser) {
+          const { data: cr } = await supabase.from('creators').select('*').eq('id', sUser.id).maybeSingle();
+          setUser(cr ? mapCreatorRow(cr) : { id: sUser.id, name: (sUser.email || 'creator').split('@')[0], email: sUser.email });
+          setView('dash');
+        }
+      } catch (e) {
+        console.error('[madrewards] session restore failed:', friendlyError(e));
+      }
+    })();
+  }, []);
 
-  // Insert into creators. Throws a specific message on failure.
-  const handleSignup = async (form) => {
-    let data, error;
-    try {
-      ({ data, error } = await supabase
-        .from('creators')
-        .insert({
-          name: form.name,
-          email: form.email.trim().toLowerCase(),
-          tiktok_handle: form.tiktok || null,
-          instagram_handle: form.instagram || null,
-        })
-        .select()
-        .single());
-    } catch (e) {
-      throw new Error(friendlyError(e)); // network/DNS failures land here
-    }
-    if (error) {
-      if (error.code === '23505') throw new Error('That email is already registered.');
-      throw new Error(friendlyError(error));
-    }
-    const creator = mapCreatorRow(data);
-    setCreators((cs) => [creator, ...cs]);
-    setUser(creator);
+  // Real login via Supabase Auth.
+  const handleLogin = async ({ email, password }) => {
+    const em = (email || '').trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: em, password });
+    if (error) throw new Error('Wrong email or password.');
+    const uid = data.user.id;
+    const { data: cr } = await supabase.from('creators').select('*').eq('id', uid).maybeSingle();
+    setUser(cr ? mapCreatorRow(cr) : { id: uid, name: em.split('@')[0], email: em });
     setView('dash');
     await loadSubmissions();
   };
 
+  // Validate an invite code (server-side; codes are not public-readable).
+  const checkInvite = async (code) => {
+    const res = await fetch('/api/redeem', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check', code }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.valid) throw new Error(data.error || 'That code is not valid or already used.');
+    return true;
+  };
+
+  // Redeem code -> create real account -> sign in.
+  const handleSignup = async (form) => {
+    const res = await fetch('/api/redeem', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'redeem',
+        code: form.code,
+        name: form.name,
+        email: (form.email || '').trim().toLowerCase(),
+        password: form.password,
+        tiktok: form.tiktok || null,
+        instagram: form.instagram || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not create your account.');
+    await handleLogin({ email: form.email, password: form.password });
+  };
+
+  // Public "request an invite" -> lands in admin Requests tab.
+  const submitRequest = async (form) => {
+    const { error } = await supabase.from('signup_requests').insert({
+      name: form.name,
+      email: (form.email || '').trim().toLowerCase(),
+      tiktok_handle: form.tiktok || null,
+      instagram_handle: form.instagram || null,
+      note: form.note || null,
+    });
+    if (error) throw new Error(friendlyError(error));
+  };
+
   const handleAdminLogin = () => { setIsAdmin(true); setView('a-dash'); };
-  const handleLogout = () => { setUser(null); setIsAdmin(false); setView('landing'); };
+  const handleLogout = async () => { try { await supabase.auth.signOut(); } catch {} setUser(null); setIsAdmin(false); setView('landing'); };
 
   // Insert into video_submissions. Throws a specific message on failure.
   const handleNewSubmission = async (data) => {
@@ -1888,19 +1977,16 @@ const App = () => {
   let body;
   if (view === 'landing') {
     body = <LandingPage go={go} theme={theme} setTheme={setTheme} />;
-  } else if (view === 'login' || view === 'signup') {
-    body = <AuthPage mode={view} go={go} onLogin={handleLogin} onSignup={handleSignup} creators={creators} />;
-  } else if (view === 'admin-login') {
-    body = <AdminLoginPage go={go} onAdminLogin={handleAdminLogin} />;
-  } else if (isAdmin) {
-    body = (
-      <AdminShell view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
-        {view === 'a-dash'        && <AdminDashboard   creators={creators} submissions={submissions} campaigns={campaigns} setView={setView} />}
-        {view === 'a-submissions' && <AdminSubmissions submissions={submissions} creators={creators} campaigns={campaigns} onUpdateStatus={updateStatus} onUpdateNotes={updateNotes} />}
-        {view === 'a-creators'    && <AdminCreators    creators={creators} submissions={submissions} />}
-        {view === 'a-campaigns'   && <AdminCampaigns   campaigns={campaigns} onSave={saveCampaign} onDelete={deleteCampaign} onToggleActive={toggleActive} />}
-      </AdminShell>
-    );
+  } else if (view === 'login') {
+    body = <LoginPage go={go} onLogin={handleLogin} />;
+  } else if (view === 'invite') {
+    body = <InvitePage go={go} onValid={async (code) => { await checkInvite(code); setInviteCode(code); setView('signup'); }} />;
+  } else if (view === 'signup') {
+    body = inviteCode
+      ? <SignupPage go={go} code={inviteCode} onSignup={handleSignup} />
+      : <InvitePage go={go} onValid={async (code) => { await checkInvite(code); setInviteCode(code); setView('signup'); }} />;
+  } else if (view === 'request') {
+    body = <RequestPage go={go} onSubmit={submitRequest} />;
   } else if (user) {
     body = (
       <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
