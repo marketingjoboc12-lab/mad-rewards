@@ -67,6 +67,8 @@ export async function POST(req: Request) {
       id: uid,
       name,
       email,
+      phone: clean(body.phone) || null,
+      cashapp: clean(body.cashapp) || null,
       tiktok_handle: clean(body.tiktok) || null,
       instagram_handle: clean(body.instagram) || null,
     }).select().maybeSingle()
