@@ -44,6 +44,11 @@ const Ico = {
   moon: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
   refresh: 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  wallet: 'M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4z',
+  clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  check: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
+  spark: 'M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4',
+  trophy: 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z',
 }
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -167,15 +172,6 @@ export default function AdminPage() {
   const owed = submissions.filter((s) => !s.paid && (s.status === 'approved' || s.status === 'paid')).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
   const activeCampaign = campaigns.find((c) => c.active)
 
-  const stats = [
-    { label: 'Creators', value: String(creators.length), hint: 'total signed up' },
-    { label: 'Submissions', value: String(submissions.length), hint: 'videos received' },
-    { label: 'Pending review', value: String(pending), hint: 'need a decision', warn: pending > 0 },
-    { label: 'Approved', value: String(approved), hint: 'cleared' },
-    { label: 'Paid out', value: money(paidOut), hint: 'sent to creators', good: true },
-    { label: 'Owed', value: money(owed), hint: 'approved, unpaid', warn: owed > 0 },
-  ]
-
   const nav = [
     { id: 'overview', label: 'Overview', d: Ico.grid },
     { id: 'campaign', label: 'Campaign', d: Ico.gift, badge: campaigns.length || undefined },
@@ -231,31 +227,76 @@ export default function AdminPage() {
         {/* ===== OVERVIEW ===== */}
         {tab === 'overview' && (
           <>
-            <div className="stat-grid">
-              {stats.map((s) => (
-                <div key={s.label} className="card stat">
-                  <div className="stat-label">{s.label}</div>
-                  <div className={`stat-value${s.good ? ' good' : ''}${s.warn ? ' warn' : ''}`}>{s.value}</div>
-                  <div className="stat-hint">{s.hint}</div>
+            {/* hero */}
+            <div className="hero">
+              <div className="hero-blob b1" />
+              <div className="hero-blob b2" />
+              <div className="hero-ico"><Icon d={Ico.trophy} size={150} /></div>
+              <div className="hero-inner">
+                <div className="hero-kick">Mad Rewards · Control room</div>
+                <h2 className="hero-h">Welcome back.</h2>
+                <p className="hero-sub">
+                  {activeCampaign
+                    ? <>“{activeCampaign.title}” is live — {(activeCampaign.tiers || []).length} tiers, {activeCampaign.cadence}, since {fmtDate(activeCampaign.starts_at)}.</>
+                    : <>No campaign is live. Creators see nothing until you launch one.</>}
+                </p>
+                <div className="hero-cta">
+                  <button className="btn btn-primary" onClick={() => setTab('campaign')}>{activeCampaign ? 'Manage campaign' : 'Launch a campaign'}</button>
+                  <button className="btn btn-ghost glassy" onClick={() => setTab('submissions')}>Review submissions{pending ? ` (${pending})` : ''}</button>
                 </div>
-              ))}
+              </div>
             </div>
 
-            <div className="card pad" style={{ marginTop: 18 }}>
-              <div className="row-between">
-                <div>
-                  <div className="card-h">Active campaign</div>
-                  {activeCampaign
-                    ? <div className="muted" style={{ marginTop: 4 }}>{activeCampaign.title} · {activeCampaign.cadence} · {(activeCampaign.tiers || []).length} tiers · from {fmtDate(activeCampaign.starts_at)}</div>
-                    : <div className="muted" style={{ marginTop: 4 }}>No active campaign. Creators see nothing until you set one.</div>}
+            {/* gradient feature cards */}
+            <div className="feature-grid">
+              <div className="feature feat-lime">
+                <div className="feat-top">
+                  <span className="feat-label">Paid to creators</span>
+                  <Icon d={Ico.wallet} size={20} />
                 </div>
-                <button className="btn btn-primary" onClick={() => setTab('campaign')}>Manage</button>
+                <div className="bar"><span style={{ width: `${paidOut + owed > 0 ? Math.round((paidOut / (paidOut + owed)) * 100) : 0}%` }} /></div>
+                <div className="feat-figs">
+                  <div><div className="feat-big">{money(paidOut)}</div><div className="feat-cap">paid out</div></div>
+                  <div className="right"><div className="feat-big">{money(owed)}</div><div className="feat-cap">still owed</div></div>
+                </div>
+              </div>
+
+              <div className="feature feat-violet">
+                <div className="feat-top">
+                  <span className="feat-label">Submissions pipeline</span>
+                  <Icon d={Ico.film} size={20} />
+                </div>
+                <div className="bar light"><span style={{ width: `${submissions.length > 0 ? Math.round((approved / submissions.length) * 100) : 0}%` }} /></div>
+                <div className="feat-figs">
+                  <div><div className="feat-big">{approved}</div><div className="feat-cap">approved</div></div>
+                  <div className="right"><div className="feat-big">{pending}</div><div className="feat-cap">pending review</div></div>
+                </div>
+              </div>
+            </div>
+
+            {/* icon tiles */}
+            <div className="tile-grid">
+              <div className="card tile">
+                <span className="tile-ico ic-lime"><Icon d={Ico.users} size={20} /></span>
+                <div><div className="tile-val">{creators.length}</div><div className="tile-lab">Creators</div></div>
+              </div>
+              <div className="card tile">
+                <span className="tile-ico ic-sky"><Icon d={Ico.film} size={20} /></span>
+                <div><div className="tile-val">{submissions.length}</div><div className="tile-lab">Submissions</div></div>
+              </div>
+              <div className="card tile">
+                <span className="tile-ico ic-amber"><Icon d={Ico.clock} size={20} /></span>
+                <div><div className="tile-val">{pending}</div><div className="tile-lab">Pending review</div></div>
+              </div>
+              <div className="card tile">
+                <span className="tile-ico ic-violet"><Icon d={Ico.check} size={20} /></span>
+                <div><div className="tile-val">{approved}</div><div className="tile-lab">Approved</div></div>
               </div>
             </div>
 
             {pending > 0 && (
-              <div className="card pad nudge" style={{ marginTop: 14 }}>
-                <div><b>{pending}</b> submission{pending > 1 ? 's' : ''} waiting for review.</div>
+              <div className="card pad nudge" style={{ marginTop: 16 }}>
+                <div><b>{pending}</b> submission{pending > 1 ? 's' : ''} waiting for a decision.</div>
                 <button className="btn btn-ghost" onClick={() => setTab('submissions')}>Review now</button>
               </div>
             )}
@@ -419,7 +460,7 @@ export default function AdminPage() {
 }
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
 .madx *{box-sizing:border-box}
 .madx{min-height:100vh;display:flex;background:var(--bg);color:var(--text);
   font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
@@ -430,7 +471,7 @@ const CSS = `
 
 /* brand */
 .brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.18em;font-size:15px;
-  font-family:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif}
+  font-family:'Fredoka',ui-sans-serif,system-ui,sans-serif}
 .brand b{font-weight:800}
 .brand-mark{width:16px;height:16px;border-radius:5px;background:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft)}
@@ -438,7 +479,7 @@ const CSS = `
 /* login */
 .login{width:380px;max-width:100%;padding:30px}
 .login-brand{margin-bottom:22px}
-.login-h1{font-family:'Bricolage Grotesque',sans-serif;font-size:26px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+.login-h1{font-family:'Fredoka',sans-serif;font-size:26px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
 
 /* sidebar */
 .sidebar{width:240px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg2);
@@ -460,7 +501,7 @@ const CSS = `
 .main{flex:1;min-width:0;padding:26px 30px 70px;max-width:1180px}
 .topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
 .crumb{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);font-weight:600}
-.page-title{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em}
+.page-title{font-family:'Fredoka',sans-serif;font-size:30px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em}
 .top-actions{display:flex;gap:10px;align-items:center}
 
 /* buttons */
@@ -481,14 +522,14 @@ const CSS = `
 /* cards */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
 .card.pad{padding:22px}
-.card-h{font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.01em}
+.card-h{font-family:'Fredoka',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.01em}
 .row-between{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 
 /* stats */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px}
 .stat{padding:18px 18px 16px}
 .stat-label{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:600}
-.stat-value{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;margin-top:8px;letter-spacing:-.02em}
+.stat-value{font-family:'Fredoka',sans-serif;font-size:30px;font-weight:800;margin-top:8px;letter-spacing:-.02em}
 .stat-value.good{color:var(--accent)}
 .stat-value.warn{color:#f59e0b}
 .stat-hint{font-size:12px;color:var(--faint);margin-top:3px}
@@ -543,6 +584,58 @@ select.input{cursor:pointer}
   padding:11px 15px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:18px}
 
 .only-mobile{display:none}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:34px 34px 30px;margin-bottom:22px;
+  border:1px solid var(--border);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
+    radial-gradient(120% 160% at 0% 120%, rgba(124,58,237,.16) 0%, transparent 50%),
+    var(--panel)}
+.hero-inner{position:relative;z-index:2;max-width:640px}
+.hero-kick{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.hero-h{font-family:'Fredoka',sans-serif;font-size:38px;font-weight:700;letter-spacing:-.01em;margin:8px 0 6px;line-height:1.02}
+.hero-sub{color:var(--dim);font-size:15px;line-height:1.5;margin:0 0 20px;max-width:520px}
+.hero-cta{display:flex;gap:10px;flex-wrap:wrap}
+.btn.glassy{background:var(--panel2);border-color:var(--border2)}
+.hero-blob{position:absolute;border-radius:50%;filter:blur(8px);opacity:.5;z-index:1;pointer-events:none}
+.hero-blob.b1{width:240px;height:240px;top:-90px;right:-40px;background:radial-gradient(circle,var(--accent) 0%,transparent 70%);opacity:.22}
+.hero-blob.b2{width:200px;height:200px;bottom:-100px;left:30%;background:radial-gradient(circle,#7c3aed 0%,transparent 70%);opacity:.20}
+.hero-ico{position:absolute;right:26px;top:50%;transform:translateY(-50%) rotate(-8deg);color:var(--accent);
+  opacity:.14;z-index:1;pointer-events:none}
+
+/* feature cards */
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.feature{border-radius:20px;padding:22px 24px;color:#0b1400;position:relative;overflow:hidden;
+  box-shadow:0 14px 32px -16px rgba(0,0,0,.5)}
+.feat-lime{background:linear-gradient(135deg,#bef264 0%,#84cc16 45%,#4d9b0f 100%);color:#10240a}
+.feat-violet{background:linear-gradient(135deg,#a78bfa 0%,#7c3aed 50%,#5b21b6 100%);color:#fff}
+.feat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.feat-label{font-weight:700;font-size:14px;letter-spacing:.01em;opacity:.92}
+.feat-top svg{opacity:.8}
+.bar{height:8px;border-radius:999px;background:rgba(0,0,0,.16);overflow:hidden;margin-bottom:16px}
+.bar.light{background:rgba(255,255,255,.28)}
+.bar span{display:block;height:100%;border-radius:999px;background:rgba(0,0,0,.55);transition:width .5s ease}
+.bar.light span{background:#fff}
+.feat-figs{display:flex;justify-content:space-between;align-items:flex-end}
+.feat-figs .right{text-align:right}
+.feat-big{font-family:'Fredoka',sans-serif;font-size:30px;font-weight:700;line-height:1}
+.feat-cap{font-size:12px;font-weight:600;opacity:.78;margin-top:4px}
+
+/* icon tiles */
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.tile{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.tile-ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+  color:#fff;flex-shrink:0;box-shadow:0 6px 16px -6px rgba(0,0,0,.4)}
+.ic-lime{background:linear-gradient(135deg,#a3e635,#4d7c0f);color:#10240a}
+.ic-violet{background:linear-gradient(135deg,#a78bfa,#6d28d9)}
+.ic-amber{background:linear-gradient(135deg,#fcd34d,#d97706);color:#3a1d00}
+.ic-sky{background:linear-gradient(135deg,#7dd3fc,#0284c7)}
+.tile-val{font-family:'Fredoka',sans-serif;font-size:26px;font-weight:700;line-height:1}
+.tile-lab{font-size:13px;color:var(--dim);margin-top:3px;font-weight:600}
+
+@media (max-width:760px){ .feature-grid{grid-template-columns:1fr} .hero-ico{display:none} .hero-h{font-size:30px} }
+
 @media (max-width:860px){
   .madx{flex-direction:column}
   .sidebar{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;
