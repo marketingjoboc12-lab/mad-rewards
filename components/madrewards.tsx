@@ -41,6 +41,8 @@ const mapSubmissionRow = (r) => ({
   platform: r.platform,
   status: r.status,
   submittedAt: r.created_at,
+  postedAt: r.posted_at || null,
+  claimedViews: r.claimed_views ?? 0,
   payout: Number(r.reward_amount) || 0,
   views: r.views ?? 0,
   paid: !!r.paid,
@@ -916,7 +918,7 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
   // ── Rewards calculator (driven by the active campaign) ──
   const tiers = deal?.tiers || [];
   const periodStart = deal?.starts_at ? new Date(deal.starts_at) : null;
-  const minePeriod = periodStart ? mine.filter((s) => new Date(s.submittedAt) >= periodStart) : mine;
+  const minePeriod = periodStart ? mine.filter((s) => new Date(s.postedAt || s.submittedAt) >= periodStart) : mine;
   const videoCount = minePeriod.length;
   const totalViews = minePeriod.reduce((sum, s) => sum + (s.views || 0), 0);
   const qualifies = (t) => (t.videos != null && videoCount >= t.videos) || (totalViews >= t.views);
@@ -932,17 +934,38 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
 
   return (
     <div className="space-y-10 md:space-y-12">
-      <div className="anim-fade-up">
-        <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">{fmtDateFull(new Date().toISOString())}</span>
-        <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">
-          Welcome back, {user.name.split(' ')[0]}.
-        </h1>
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] p-7 md:p-10 anim-fade-up"
+        style={{ background: 'radial-gradient(120% 140% at 100% 0%, var(--accent-soft) 0%, transparent 45%), radial-gradient(120% 160% at 0% 120%, rgba(124,58,237,0.14) 0%, transparent 50%), var(--elev1)' }}>
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
+        <Trophy className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.07] pointer-events-none hidden sm:block" size={150} />
+        <div className="relative">
+          <span className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">{fmtDateFull(new Date().toISOString())}</span>
+          <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">
+            Welcome back, {user.name.split(' ')[0]}.
+          </h1>
+          <p className="mt-3 text-[var(--text-dim)] max-w-lg leading-relaxed">
+            {deal
+              ? (current
+                  ? <>You've unlocked <span className="text-[var(--text)] font-semibold">{current.reward_label}</span> so far this {deal.cadence === 'monthly' ? 'month' : 'week'}.</>
+                  : <>No reward unlocked yet — keep posting to hit your first tier.</>)
+              : <>No active campaign right now. Check back soon.</>}
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 md:gap-4 anim-fade-up anim-d-100">
-        <Stat label="Earned" value={fmtMoney(earned)} icon={Wallet} accent />
-        <Stat label="Pending" value={fmtMoney(pendingPayout)} icon={Clock} />
-        <Stat label="In review" value={pending} icon={Inbox} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 anim-fade-up anim-d-100">
+        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
+          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a3e635,#4d7c0f)' }}><Wallet size={18} /></span>
+          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(earned)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Earned</div></div>
+        </div>
+        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
+          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a78bfa,#6d28d9)' }}><Clock size={18} /></span>
+          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(pendingPayout)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Pending</div></div>
+        </div>
+        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
+          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#fcd34d,#d97706)' }}><Inbox size={18} /></span>
+          <div><div className="font-display font-bold text-2xl leading-none">{pending}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">In review</div></div>
+        </div>
       </div>
 
       {/* ── REWARDS CALCULATOR ── */}
@@ -964,21 +987,21 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
               </div>
             </div>
 
-            <div className="mt-8 p-5 rounded-2xl bg-[var(--elev2)] border border-[var(--border)]">
-              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">You've unlocked</div>
-              <div className="font-display font-bold text-2xl">{current ? current.reward_label : 'Nothing yet — keep posting'}</div>
+            <div className="mt-8 p-6 rounded-2xl" style={{ background: 'linear-gradient(135deg,#bef264,#84cc16 50%,#4d9b0f)', color: '#10240a' }}>
+              <div className="text-[11px] uppercase tracking-[0.12em] font-bold opacity-70 mb-1.5">You've unlocked</div>
+              <div className="font-display font-extrabold text-3xl">{current ? current.reward_label : 'Nothing yet — keep posting'}</div>
               {next ? (
                 <>
-                  <div className="mt-4 text-sm text-[var(--text-dim)]">
-                    Next: <span className="text-[var(--text)] font-semibold">{next.reward_label}</span> — {nf(viewsToNext)} more views
+                  <div className="mt-4 text-sm font-medium opacity-90">
+                    Next: <span className="font-bold">{next.reward_label}</span> — {nf(viewsToNext)} more views
                     {videosToNext != null && <> or {videosToNext} more videos</>}
                   </div>
-                  <div className="mt-3 h-2 rounded-full bg-[var(--elev1)] overflow-hidden">
-                    <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${progress}%` }} />
+                  <div className="mt-3 h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(16,36,10,0.18)' }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'rgba(16,36,10,0.7)' }} />
                   </div>
                 </>
               ) : (
-                <div className="mt-4 text-sm font-semibold text-[var(--accent)]">Top tier reached. 🎉</div>
+                <div className="mt-4 text-sm font-bold">Top tier reached. 🎉</div>
               )}
             </div>
 
@@ -1056,19 +1079,24 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
 
 const SubmitForm = ({ user, onSubmit }) => {
   const [url, setUrl] = useState('');
+  const [platform, setPlatform] = useState('tiktok');
+  const [postedAt, setPostedAt] = useState('');
+  const [claimedViews, setClaimedViews] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const ready = url && postedAt && claimedViews !== '';
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!url) return;
+    if (!ready) return;
     setError('');
     setSuccess(false);
     setSubmitting(true);
     try {
-      await onSubmit({ creatorId: user.id, url, platform: detectPlatform(url) });
-      setUrl('');
+      await onSubmit({ creatorId: user.id, url, platform, postedAt, claimedViews: Number(claimedViews) || 0 });
+      setUrl(''); setPostedAt(''); setClaimedViews('');
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2400);
     } catch (err) {
@@ -1078,6 +1106,8 @@ const SubmitForm = ({ user, onSubmit }) => {
     }
   };
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <Card className="p-6 md:p-8 anim-fade-up anim-d-300">
       <div className="flex items-center gap-3 mb-6">
@@ -1085,30 +1115,73 @@ const SubmitForm = ({ user, onSubmit }) => {
           <Upload size={16} strokeWidth={2.4} className="text-black" />
         </div>
         <div>
-          <h3 className="font-display font-bold text-xl tracking-tight">Submit a link</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-0.5">Paste your TikTok or Instagram video URL</p>
+          <h3 className="font-display font-bold text-xl tracking-tight">Submit a video</h3>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">Add your video, where it posted, when, and its views</p>
         </div>
       </div>
-      <form onSubmit={submit} className="space-y-5">
+
+      <form onSubmit={submit} className="space-y-6">
+        {/* platform toggle */}
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Platform</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[{ id: 'tiktok', label: 'TikTok' }, { id: 'instagram', label: 'Instagram' }].map((p) => (
+              <button
+                type="button"
+                key={p.id}
+                onClick={() => setPlatform(p.id)}
+                className={`flex items-center justify-center gap-2 h-12 rounded-2xl border font-semibold text-sm transition-all ${platform === p.id ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]' : 'border-[var(--border)] bg-[var(--elev1)] text-[var(--text-dim)] hover:border-[var(--border-strong)]'}`}
+              >
+                <PlatformIcon platform={p.id} />{p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* url */}
         <Field
           label="Video URL"
           icon={LinkIcon}
-          placeholder="https://www.tiktok.com/@you/video/..."
+          placeholder={platform === 'instagram' ? 'https://www.instagram.com/reel/...' : 'https://www.tiktok.com/@you/video/...'}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
-        <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-          {url && (
-            <div className="text-xs text-[var(--text-dim)] flex items-center gap-2">
-              <PlatformIcon platform={detectPlatform(url)} />
-              <span className="capitalize">{detectPlatform(url) === 'other' ? 'Unknown platform' : detectPlatform(url)}</span>
-            </div>
-          )}
-          <div className="flex items-center gap-3 ml-auto">
-            {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
-            {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted</span>}
-            <Btn type="submit" disabled={!url || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit'}</Btn>
+
+        {/* date + views */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Date posted</label>
+            <input
+              type="date"
+              max={today}
+              value={postedAt}
+              onChange={(e) => setPostedAt(e.target.value)}
+              className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
+            />
+            <p className="text-[11px] text-[var(--text-faint)] mt-2 leading-snug">
+              All data is verified. Submitting false info means losing access to the program.
+            </p>
           </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Views on this video</label>
+            <input
+              type="number"
+              min="0"
+              placeholder="e.g. 48200"
+              value={claimedViews}
+              onChange={(e) => setClaimedViews(e.target.value)}
+              className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
+            />
+            <p className="text-[11px] text-[var(--text-faint)] mt-2 leading-snug">
+              All data is verified. Submitting false info means losing access to the program.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-1">
+          {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
+          {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted for review</span>}
+          <Btn type="submit" disabled={!ready || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit for review'}</Btn>
         </div>
       </form>
     </Card>
@@ -1781,6 +1854,8 @@ const App = () => {
         creator_id: data.creatorId,
         video_url: data.url,
         platform: data.platform,
+        posted_at: data.postedAt || null,
+        claimed_views: Number(data.claimedViews) || 0,
       }));
     } catch (e) {
       throw new Error(friendlyError(e)); // network/DNS failures land here
