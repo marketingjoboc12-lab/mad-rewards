@@ -29,13 +29,29 @@ const DEFAULT_TIERS: Tier[] = [
   { videos: null, views: 1000000, reward_label: '$350 + Mega device', reward_amount: 350 },
 ]
 
-const statusColor: Record<string, { bg: string; fg: string }> = {
-  pending: { bg: '#fef3c7', fg: '#92400e' }, approved: { bg: '#dbeafe', fg: '#1e40af' },
-  rejected: { bg: '#fee2e2', fg: '#991b1b' }, paid: { bg: '#dcfce7', fg: '#166534' },
-}
 const fmtDate = (s: string) => { if (!s) return '—'; try { return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return s } }
 const money = (n: number) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+const num = (n: number) => (Number(n) || 0).toLocaleString()
 const toUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`)
+
+// tiny inline icons (no external deps)
+const Ico = {
+  grid: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  gift: 'M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7a3 3 0 1 0-3-3c0 1.66 1.34 3 3 3zM12 7a3 3 0 1 1 3-3c0 1.66-1.34 3-3 3z',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  film: 'M2 4h20v16H2zM7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5',
+  sun: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+  moon: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
+  refresh: 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15',
+  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+}
+function Icon({ d, size = 18 }: { d: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {d.split('M').filter(Boolean).map((seg, i) => <path key={i} d={'M' + seg} />)}
+    </svg>
+  )
+}
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -47,6 +63,8 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [tab, setTab] = useState<'overview' | 'campaign' | 'creators' | 'submissions'>('overview')
 
   const call = async (payload: object) => {
     const res = await fetch('/api/admin', {
@@ -77,15 +95,15 @@ export default function AdminPage() {
   }
 
   // ----- campaign editing -----
-  const newCampaign = () => setEditing({
+  const newCampaign = () => { setEditing({
     title: 'This Week', active: true, cadence: 'weekly',
     starts_at: new Date().toISOString().slice(0, 10),
     tiers: DEFAULT_TIERS.map((t) => ({ ...t })), examples: [],
-  })
-  const editCampaign = (c: Campaign) => setEditing({
+  }); setTab('campaign') }
+  const editCampaign = (c: Campaign) => { setEditing({
     ...c, starts_at: (c.starts_at || '').slice(0, 10),
     tiers: (c.tiers || []).map((t) => ({ ...t })), examples: [...(c.examples || [])],
-  })
+  }); setTab('campaign') }
   const saveCampaign = async () => {
     if (!editing) return
     setSaving(true); setError('')
@@ -109,33 +127,35 @@ export default function AdminPage() {
 
   const creatorFor = (cid: string) => creators.find((c) => c.id === cid)
 
-  // ---------- styles ----------
-  const page: React.CSSProperties = { minHeight: '100vh', background: '#f6f7f9', color: '#111827', fontFamily: 'system-ui, -apple-system, sans-serif' }
-  const wrap: React.CSSProperties = { maxWidth: 1100, margin: '0 auto', padding: '24px 20px 64px' }
-  const card: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }
-  const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, letterSpacing: '.04em', textTransform: 'uppercase', color: '#6b7280', padding: '12px 14px', borderBottom: '1px solid #eef0f2', whiteSpace: 'nowrap' }
-  const td: React.CSSProperties = { padding: '12px 14px', borderBottom: '1px solid #f1f3f5', fontSize: 14, verticalAlign: 'middle' }
-  const inputS: React.CSSProperties = { width: 72, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }
-  const fieldS: React.CSSProperties = { padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }
-  const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 10, border: '1px solid #d1d5db', background: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }
-  const btnDark: React.CSSProperties = { ...btn, background: '#111827', color: '#fff', border: 'none' }
-  const pill = (s: string): React.CSSProperties => ({ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: (statusColor[s] || statusColor.pending).bg, color: (statusColor[s] || statusColor.pending).fg })
+  const dark = theme === 'dark'
+  const vars: any = dark ? {
+    '--bg': '#0a0a0b', '--bg2': '#0f0f11', '--panel': '#141417', '--panel2': '#1b1b1f',
+    '--border': '#262629', '--border2': '#34343b', '--text': '#f4f4f5', '--dim': '#9b9ba3',
+    '--faint': '#6b6b73', '--accent': '#c6f24e', '--accent-ink': '#0d0f08', '--accent-soft': 'rgba(198,242,78,0.12)',
+    '--shadow': '0 1px 0 rgba(255,255,255,0.03), 0 8px 30px -12px rgba(0,0,0,0.6)',
+  } : {
+    '--bg': '#f4f5f7', '--bg2': '#eef0f3', '--panel': '#ffffff', '--panel2': '#f6f7f9',
+    '--border': '#e6e8ec', '--border2': '#d4d7dd', '--text': '#0e1116', '--dim': '#5b6470',
+    '--faint': '#9aa2ad', '--accent': '#5b8f00', '--accent-ink': '#ffffff', '--accent-soft': 'rgba(91,143,0,0.10)',
+    '--shadow': '0 1px 2px rgba(16,24,40,0.04), 0 12px 28px -16px rgba(16,24,40,0.18)',
+  }
 
   // ---------- login ----------
   if (!authed) {
     return (
-      <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ ...card, width: 360, padding: 28 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Mad Rewards Admin</h1>
-          <p style={{ color: '#6b7280', fontSize: 14, margin: '0 0 20px' }}>Enter your admin password.</p>
-          <form onSubmit={login}>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"
-              style={{ width: '100%', padding: '11px 12px', border: '1px solid #d1d5db', borderRadius: 10, fontSize: 15, marginBottom: 12, boxSizing: 'border-box' }} />
-            <button type="submit" disabled={loading} style={{ ...btnDark, width: '100%', padding: 11, fontSize: 15 }}>
-              {loading ? 'Checking…' : 'Enter'}
+      <div className="madx madx-center" style={vars}>
+        <style>{CSS}</style>
+        <div className="card login">
+          <div className="brand login-brand"><span className="brand-mark" />MAD <b>REWARDS</b></div>
+          <h1 className="login-h1">Admin access</h1>
+          <p className="muted">Enter your admin password to continue.</p>
+          <form onSubmit={login} style={{ marginTop: 18 }}>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input" style={{ width: '100%' }} />
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }}>
+              {loading ? 'Checking…' : 'Enter dashboard'}
             </button>
           </form>
-          {error && <p style={{ color: '#dc2626', fontSize: 14, marginTop: 12 }}>{error}</p>}
+          {error && <p className="err">{error}</p>}
         </div>
       </div>
     )
@@ -144,186 +164,397 @@ export default function AdminPage() {
   const pending = submissions.filter((s) => s.status === 'pending').length
   const approved = submissions.filter((s) => s.status === 'approved').length
   const paidOut = submissions.filter((s) => s.paid).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
-  const owed = submissions.filter((s) => !s.paid).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
+  const owed = submissions.filter((s) => !s.paid && (s.status === 'approved' || s.status === 'paid')).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
+  const activeCampaign = campaigns.find((c) => c.active)
+
   const stats = [
-    { label: 'Creators', value: creators.length }, { label: 'Submissions', value: submissions.length },
-    { label: 'Pending', value: pending }, { label: 'Approved', value: approved },
-    { label: 'Paid out', value: money(paidOut) }, { label: 'Owed', value: money(owed) },
+    { label: 'Creators', value: String(creators.length), hint: 'total signed up' },
+    { label: 'Submissions', value: String(submissions.length), hint: 'videos received' },
+    { label: 'Pending review', value: String(pending), hint: 'need a decision', warn: pending > 0 },
+    { label: 'Approved', value: String(approved), hint: 'cleared' },
+    { label: 'Paid out', value: money(paidOut), hint: 'sent to creators', good: true },
+    { label: 'Owed', value: money(owed), hint: 'approved, unpaid', warn: owed > 0 },
   ]
 
+  const nav = [
+    { id: 'overview', label: 'Overview', d: Ico.grid },
+    { id: 'campaign', label: 'Campaign', d: Ico.gift, badge: campaigns.length || undefined },
+    { id: 'creators', label: 'Creators', d: Ico.users, badge: creators.length || undefined },
+    { id: 'submissions', label: 'Submissions', d: Ico.film, badge: pending || undefined },
+  ] as const
+
+  const titleFor: Record<string, string> = { overview: 'Overview', campaign: 'Campaign', creators: 'Creators', submissions: 'Video submissions' }
+
   return (
-    <div style={page}>
-      <div style={wrap}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0 }}>Mad Rewards Admin</h1>
-          <button onClick={refresh} style={btn}>Refresh</button>
-        </div>
-        {error && <p style={{ color: '#dc2626', fontSize: 14, marginBottom: 12 }}>{error}</p>}
+    <div className="madx" style={vars}>
+      <style>{CSS}</style>
 
-        {/* ---------- CAMPAIGN MANAGER ---------- */}
-        <div style={{ ...card, padding: 20, marginBottom: 28 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Weekly Campaign</h2>
-            {!editing && <button onClick={newCampaign} style={btnDark}>+ New campaign</button>}
-          </div>
-
-          {!editing && (
-            <div>
-              {campaigns.length === 0 && <p style={{ color: '#9ca3af', fontSize: 14 }}>No campaigns yet. Create one to set this week's reward tiers.</p>}
-              {campaigns.map((c) => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f3f5' }}>
-                  <div>
-                    <span style={{ fontWeight: 600 }}>{c.title}</span>
-                    <span style={{ color: '#6b7280', fontSize: 13, marginLeft: 10 }}>{c.cadence} · {(c.tiers || []).length} tiers · from {fmtDate(c.starts_at)}</span>
-                    {c.active && <span style={{ ...pill('paid'), marginLeft: 10 }}>active</span>}
-                  </div>
-                  <button onClick={() => editCampaign(c)} style={btn}>Edit</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {editing && (
-            <div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                <label style={{ flex: '1 1 200px' }}>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Title</div>
-                  <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} style={{ ...fieldS, width: '100%', boxSizing: 'border-box' }} />
-                </label>
-                <label>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Cadence</div>
-                  <select value={editing.cadence} onChange={(e) => setEditing({ ...editing, cadence: e.target.value })} style={fieldS}>
-                    <option value="weekly">weekly</option><option value="monthly">monthly</option>
-                  </select>
-                </label>
-                <label>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Starts</div>
-                  <input type="date" value={editing.starts_at} onChange={(e) => setEditing({ ...editing, starts_at: e.target.value })} style={fieldS} />
-                </label>
-                <label style={{ display: 'flex', alignItems: 'flex-end', gap: 6, paddingBottom: 8 }}>
-                  <input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} style={{ width: 18, height: 18 }} />
-                  <span style={{ fontSize: 14 }}>Active (shown to creators)</span>
-                </label>
-              </div>
-
-              {/* tiers */}
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Reward tiers</div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-                  <thead><tr>
-                    <th style={th}>Videos / week</th><th style={th}>Or views</th><th style={th}>Reward label</th><th style={th}>$ amount</th><th style={th}></th>
-                  </tr></thead>
-                  <tbody>
-                    {editing.tiers.map((t, i) => (
-                      <tr key={i}>
-                        <td style={td}>
-                          <input type="number" value={t.videos ?? ''} placeholder="—"
-                            onChange={(e) => setTier(i, { videos: e.target.value === '' ? null : Number(e.target.value) })} style={inputS} />
-                        </td>
-                        <td style={td}><input type="number" value={t.views} onChange={(e) => setTier(i, { views: Number(e.target.value) })} style={{ ...inputS, width: 110 }} /></td>
-                        <td style={td}><input value={t.reward_label} onChange={(e) => setTier(i, { reward_label: e.target.value })} style={{ ...fieldS, width: 180 }} /></td>
-                        <td style={td}><input type="number" value={t.reward_amount} onChange={(e) => setTier(i, { reward_amount: Number(e.target.value) })} style={inputS} /></td>
-                        <td style={td}><button onClick={() => removeTier(i)} style={{ ...btn, padding: '4px 10px', color: '#dc2626' }}>Remove</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button onClick={addTier} style={{ ...btn, marginTop: 8 }}>+ Add tier</button>
-
-              {/* examples */}
-              <div style={{ fontSize: 13, fontWeight: 700, margin: '20px 0 8px' }}>Example video links</div>
-              {editing.examples.map((x, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input value={x} placeholder="https://www.tiktok.com/@..." onChange={(e) => setExample(i, e.target.value)} style={{ ...fieldS, flex: 1 }} />
-                  <button onClick={() => removeExample(i)} style={{ ...btn, color: '#dc2626' }}>Remove</button>
-                </div>
-              ))}
-              <button onClick={addExample} style={btn}>+ Add example</button>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                <button onClick={saveCampaign} disabled={saving} style={btnDark}>{saving ? 'Saving…' : 'Save campaign'}</button>
-                <button onClick={() => setEditing(null)} style={btn}>Cancel</button>
-                {editing.id && <button onClick={deleteCampaign} style={{ ...btn, color: '#dc2626', marginLeft: 'auto' }}>Delete</button>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ---------- STATS ---------- */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 28 }}>
-          {stats.map((s) => (
-            <div key={s.label} style={{ ...card, padding: '16px 18px' }}>
-              <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.04em' }}>{s.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, marginTop: 4 }}>{s.value}</div>
-            </div>
+      {/* ---------- SIDEBAR ---------- */}
+      <aside className="sidebar">
+        <div className="brand"><span className="brand-mark" />MAD <b>REWARDS</b></div>
+        <nav className="nav">
+          {nav.map((n) => (
+            <button key={n.id} onClick={() => setTab(n.id as any)} className={`navbtn${tab === n.id ? ' active' : ''}`}>
+              <Icon d={n.d} size={18} />
+              <span>{n.label}</span>
+              {n.badge ? <span className="navbadge">{n.badge}</span> : null}
+            </button>
           ))}
+        </nav>
+        <div className="side-foot">
+          <button className="navbtn" onClick={() => setTheme(dark ? 'light' : 'dark')}>
+            <Icon d={dark ? Ico.sun : Ico.moon} size={18} /><span>{dark ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+          <button className="navbtn danger" onClick={() => { setAuthed(false); setPassword('') }}>
+            <Icon d={Ico.logout} size={18} /><span>Log out</span>
+          </button>
         </div>
+      </aside>
 
-        {/* ---------- CREATORS ---------- */}
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 12px' }}>Creators ({creators.length})</h2>
-        <div style={{ ...card, overflowX: 'auto', marginBottom: 36 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
-            <thead><tr><th style={th}>Name</th><th style={th}>Email</th><th style={th}>TikTok</th><th style={th}>Instagram</th><th style={th}>Status</th><th style={th}>Joined</th></tr></thead>
-            <tbody>
-              {creators.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ ...td, fontWeight: 600 }}>{c.name}</td>
-                  <td style={td}>{c.email}</td>
-                  <td style={td}>{c.tiktok_handle || '—'}</td>
-                  <td style={td}>{c.instagram_handle || '—'}</td>
-                  <td style={td}><span style={pill(c.status)}>{c.status}</span></td>
-                  <td style={{ ...td, color: '#6b7280' }}>{fmtDate(c.created_at)}</td>
-                </tr>
+      {/* ---------- MAIN ---------- */}
+      <main className="main">
+        <header className="topbar">
+          <div>
+            <div className="crumb">{fmtDate(new Date().toISOString())}</div>
+            <h1 className="page-title">{titleFor[tab]}</h1>
+          </div>
+          <div className="top-actions">
+            <button className="iconbtn only-mobile" onClick={() => setTheme(dark ? 'light' : 'dark')} title="Toggle theme">
+              <Icon d={dark ? Ico.sun : Ico.moon} />
+            </button>
+            <button className="btn btn-ghost" onClick={refresh}><Icon d={Ico.refresh} size={16} />Refresh</button>
+          </div>
+        </header>
+
+        {error && <div className="banner">{error}</div>}
+
+        {/* ===== OVERVIEW ===== */}
+        {tab === 'overview' && (
+          <>
+            <div className="stat-grid">
+              {stats.map((s) => (
+                <div key={s.label} className="card stat">
+                  <div className="stat-label">{s.label}</div>
+                  <div className={`stat-value${s.good ? ' good' : ''}${s.warn ? ' warn' : ''}`}>{s.value}</div>
+                  <div className="stat-hint">{s.hint}</div>
+                </div>
               ))}
-              {creators.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9ca3af' }} colSpan={6}>No creators yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+            </div>
 
-        {/* ---------- SUBMISSIONS ---------- */}
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 12px' }}>Video submissions ({submissions.length})</h2>
-        <div style={{ ...card, overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
-            <thead><tr>
-              <th style={th}>Creator</th><th style={th}>Video</th><th style={th}>Platform</th>
-              <th style={th}>Submitted</th><th style={th}>Views</th><th style={th}>Status</th><th style={th}>Reward</th><th style={th}>Paid</th>
-            </tr></thead>
-            <tbody>
-              {submissions.map((s) => {
-                const c = creatorFor(s.creator_id)
-                return (
-                  <tr key={s.id}>
-                    <td style={td}>
-                      <div style={{ fontWeight: 600 }}>{c?.name || '—'}</div>
-                      <div style={{ color: '#6b7280', fontSize: 12 }}>{c?.email || s.creator_id.slice(0, 8)}</div>
-                    </td>
-                    <td style={{ ...td, maxWidth: 200 }}>
-                      <a href={toUrl(s.video_url)} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.video_url}</a>
-                    </td>
-                    <td style={{ ...td, textTransform: 'capitalize', color: '#6b7280' }}>{s.platform}</td>
-                    <td style={{ ...td, color: '#6b7280' }}>{fmtDate(s.created_at)}</td>
-                    <td style={td}><input type="number" defaultValue={s.views} style={inputS} onBlur={(e) => { const v = Number(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
-                    <td style={td}>
-                      <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} style={{ padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, textTransform: 'capitalize' }}>
-                        {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ color: '#6b7280' }}>$</span>
-                        <input type="number" defaultValue={s.reward_amount} style={inputS} onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }} />
-                      </div>
-                    </td>
-                    <td style={td}><input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} style={{ width: 18, height: 18, cursor: 'pointer' }} /></td>
+            <div className="card pad" style={{ marginTop: 18 }}>
+              <div className="row-between">
+                <div>
+                  <div className="card-h">Active campaign</div>
+                  {activeCampaign
+                    ? <div className="muted" style={{ marginTop: 4 }}>{activeCampaign.title} · {activeCampaign.cadence} · {(activeCampaign.tiers || []).length} tiers · from {fmtDate(activeCampaign.starts_at)}</div>
+                    : <div className="muted" style={{ marginTop: 4 }}>No active campaign. Creators see nothing until you set one.</div>}
+                </div>
+                <button className="btn btn-primary" onClick={() => setTab('campaign')}>Manage</button>
+              </div>
+            </div>
+
+            {pending > 0 && (
+              <div className="card pad nudge" style={{ marginTop: 14 }}>
+                <div><b>{pending}</b> submission{pending > 1 ? 's' : ''} waiting for review.</div>
+                <button className="btn btn-ghost" onClick={() => setTab('submissions')}>Review now</button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ===== CAMPAIGN ===== */}
+        {tab === 'campaign' && (
+          <div className="card pad">
+            <div className="row-between" style={{ marginBottom: 16 }}>
+              <div className="card-h">Reward campaign</div>
+              {!editing && <button onClick={newCampaign} className="btn btn-primary">+ New campaign</button>}
+            </div>
+
+            {!editing && (
+              <div>
+                {campaigns.length === 0 && <p className="muted">No campaigns yet. Create one to set the reward tiers creators see.</p>}
+                {campaigns.map((c) => (
+                  <div key={c.id} className="list-row">
+                    <div>
+                      <span style={{ fontWeight: 700 }}>{c.title}</span>
+                      <span className="muted" style={{ marginLeft: 10, fontSize: 13 }}>{c.cadence} · {(c.tiers || []).length} tiers · from {fmtDate(c.starts_at)}</span>
+                      {c.active && <span className="pill paid" style={{ marginLeft: 10 }}>active</span>}
+                    </div>
+                    <button onClick={() => editCampaign(c)} className="btn btn-ghost">Edit</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {editing && (
+              <div>
+                <div className="form-row">
+                  <label className="field" style={{ flex: '1 1 220px' }}>
+                    <span className="flabel">Title</span>
+                    <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="input" style={{ width: '100%' }} />
+                  </label>
+                  <label className="field">
+                    <span className="flabel">Cadence</span>
+                    <select value={editing.cadence} onChange={(e) => setEditing({ ...editing, cadence: e.target.value })} className="input">
+                      <option value="weekly">weekly</option><option value="monthly">monthly</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span className="flabel">Starts</span>
+                    <input type="date" value={editing.starts_at} onChange={(e) => setEditing({ ...editing, starts_at: e.target.value })} className="input" />
+                  </label>
+                  <label className="field check">
+                    <input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />
+                    <span>Active (shown to creators)</span>
+                  </label>
+                </div>
+
+                <div className="flabel" style={{ marginTop: 18, marginBottom: 8 }}>Reward tiers</div>
+                <div className="table-scroll">
+                  <table className="tbl tiers">
+                    <thead><tr>
+                      <th>Videos / week</th><th>Or views</th><th>Reward label</th><th>$ amount</th><th></th>
+                    </tr></thead>
+                    <tbody>
+                      {editing.tiers.map((t, i) => (
+                        <tr key={i}>
+                          <td><input type="number" value={t.videos ?? ''} placeholder="—" onChange={(e) => setTier(i, { videos: e.target.value === '' ? null : Number(e.target.value) })} className="input sm" /></td>
+                          <td><input type="number" value={t.views} onChange={(e) => setTier(i, { views: Number(e.target.value) })} className="input" style={{ width: 120 }} /></td>
+                          <td><input value={t.reward_label} onChange={(e) => setTier(i, { reward_label: e.target.value })} className="input" style={{ width: 190 }} /></td>
+                          <td><input type="number" value={t.reward_amount} onChange={(e) => setTier(i, { reward_amount: Number(e.target.value) })} className="input sm" /></td>
+                          <td><button onClick={() => removeTier(i)} className="btn btn-ghost danger sm">Remove</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button onClick={addTier} className="btn btn-ghost" style={{ marginTop: 10 }}>+ Add tier</button>
+
+                <div className="flabel" style={{ marginTop: 22, marginBottom: 8 }}>Example video links</div>
+                {editing.examples.map((x, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                    <input value={x} placeholder="https://www.tiktok.com/@..." onChange={(e) => setExample(i, e.target.value)} className="input" style={{ flex: 1 }} />
+                    <button onClick={() => removeExample(i)} className="btn btn-ghost danger">Remove</button>
+                  </div>
+                ))}
+                <button onClick={addExample} className="btn btn-ghost">+ Add example</button>
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 22, alignItems: 'center' }}>
+                  <button onClick={saveCampaign} disabled={saving} className="btn btn-primary">{saving ? 'Saving…' : 'Save campaign'}</button>
+                  <button onClick={() => setEditing(null)} className="btn btn-ghost">Cancel</button>
+                  {editing.id && <button onClick={deleteCampaign} className="btn btn-ghost danger" style={{ marginLeft: 'auto' }}>Delete</button>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== CREATORS ===== */}
+        {tab === 'creators' && (
+          <div className="card table-scroll">
+            <table className="tbl">
+              <thead><tr><th>Name</th><th>Email</th><th>TikTok</th><th>Instagram</th><th>Status</th><th>Joined</th></tr></thead>
+              <tbody>
+                {creators.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600 }}>{c.name}</td>
+                    <td className="muted">{c.email}</td>
+                    <td>{c.tiktok_handle || '—'}</td>
+                    <td>{c.instagram_handle || '—'}</td>
+                    <td><span className={`pill ${c.status}`}>{c.status}</span></td>
+                    <td className="muted">{fmtDate(c.created_at)}</td>
                   </tr>
-                )
-              })}
-              {submissions.length === 0 && <tr><td style={{ ...td, textAlign: 'center', color: '#9ca3af' }} colSpan={8}>No submissions yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ))}
+                {creators.length === 0 && <tr><td className="empty" colSpan={6}>No creators yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ===== SUBMISSIONS ===== */}
+        {tab === 'submissions' && (
+          <div className="card table-scroll">
+            <table className="tbl">
+              <thead><tr>
+                <th>Creator</th><th>Video</th><th>Platform</th><th>Submitted</th><th>Views</th><th>Status</th><th>Reward</th><th>Paid</th>
+              </tr></thead>
+              <tbody>
+                {submissions.map((s) => {
+                  const c = creatorFor(s.creator_id)
+                  return (
+                    <tr key={s.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{c?.name || '—'}</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{c?.email || s.creator_id.slice(0, 8)}</div>
+                      </td>
+                      <td style={{ maxWidth: 200 }}>
+                        <a href={toUrl(s.video_url)} target="_blank" rel="noreferrer" className="link ellipsis">{s.video_url}</a>
+                      </td>
+                      <td className="muted" style={{ textTransform: 'capitalize' }}>{s.platform}</td>
+                      <td className="muted">{fmtDate(s.created_at)}</td>
+                      <td><input type="number" defaultValue={s.views} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
+                      <td>
+                        <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
+                          {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span className="muted">$</span>
+                          <input type="number" defaultValue={s.reward_amount} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }} />
+                        </div>
+                      </td>
+                      <td><input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} className="chk" /></td>
+                    </tr>
+                  )
+                })}
+                {submissions.length === 0 && <tr><td className="empty" colSpan={8}>No submissions yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </main>
     </div>
   )
 }
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap');
+.madx *{box-sizing:border-box}
+.madx{min-height:100vh;display:flex;background:var(--bg);color:var(--text);
+  font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+.madx-center{align-items:center;justify-content:center;padding:24px}
+.madx button{font-family:inherit}
+.muted{color:var(--dim)}
+.err{color:#ef4444;font-size:14px;margin-top:12px}
+
+/* brand */
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.18em;font-size:15px;
+  font-family:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif}
+.brand b{font-weight:800}
+.brand-mark{width:16px;height:16px;border-radius:5px;background:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* login */
+.login{width:380px;max-width:100%;padding:30px}
+.login-brand{margin-bottom:22px}
+.login-h1{font-family:'Bricolage Grotesque',sans-serif;font-size:26px;font-weight:800;margin:0 0 6px;letter-spacing:-.01em}
+
+/* sidebar */
+.sidebar{width:240px;flex-shrink:0;border-right:1px solid var(--border);background:var(--bg2);
+  padding:22px 16px;display:flex;flex-direction:column;gap:8px;position:sticky;top:0;height:100vh}
+.sidebar .brand{padding:0 8px 14px}
+.nav{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:3px;padding-top:12px;border-top:1px solid var(--border)}
+.navbtn{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border-radius:11px;
+  border:1px solid transparent;background:transparent;color:var(--dim);font-size:14px;font-weight:600;
+  cursor:pointer;text-align:left;transition:all .15s ease}
+.navbtn:hover{background:var(--panel);color:var(--text)}
+.navbtn.active{background:var(--panel);color:var(--text);border-color:var(--border2);box-shadow:var(--shadow)}
+.navbtn.active svg{color:var(--accent)}
+.navbtn.danger:hover{color:#ef4444}
+.navbadge{margin-left:auto;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent);
+  padding:2px 8px;border-radius:999px;min-width:22px;text-align:center}
+
+/* main */
+.main{flex:1;min-width:0;padding:26px 30px 70px;max-width:1180px}
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px}
+.crumb{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);font-weight:600}
+.page-title{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em}
+.top-actions{display:flex;gap:10px;align-items:center}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:11px;font-size:14px;
+  font-weight:700;cursor:pointer;border:1px solid var(--border2);background:var(--panel);color:var(--text);
+  transition:all .15s ease}
+.btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+.btn:disabled{opacity:.55;cursor:default;transform:none}
+.btn-primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn-primary:hover{filter:brightness(1.06);border-color:var(--accent)}
+.btn-ghost{background:var(--panel)}
+.btn.danger{color:#ef4444;border-color:transparent;background:transparent}
+.btn.danger:hover{border-color:#ef4444;transform:none}
+.btn.sm{padding:5px 11px;font-size:13px;border-radius:9px}
+.iconbtn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;
+  border:1px solid var(--border2);background:var(--panel);color:var(--text);cursor:pointer}
+
+/* cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+.card.pad{padding:22px}
+.card-h{font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.01em}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+
+/* stats */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:14px}
+.stat{padding:18px 18px 16px}
+.stat-label{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:600}
+.stat-value{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;margin-top:8px;letter-spacing:-.02em}
+.stat-value.good{color:var(--accent)}
+.stat-value.warn{color:#f59e0b}
+.stat-hint{font-size:12px;color:var(--faint);margin-top:3px}
+
+.nudge{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  border-color:var(--accent);background:var(--accent-soft)}
+
+/* list rows */
+.list-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.list-row:last-child{border-bottom:none}
+
+/* forms */
+.form-row{display:flex;flex-wrap:wrap;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field.check{flex-direction:row;align-items:center;gap:8px;align-self:flex-end;padding-bottom:9px}
+.flabel{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.input{padding:9px 11px;border:1px solid var(--border2);border-radius:10px;font-size:14px;
+  background:var(--panel2);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input.sm{width:78px}
+select.input{cursor:pointer}
+.check input,.chk{width:18px;height:18px;cursor:pointer;accent-color:var(--accent)}
+
+/* tables */
+.table-scroll{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;min-width:680px}
+.tbl.tiers{min-width:640px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;padding:13px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:13px 16px;border-bottom:1px solid var(--border);font-size:14px;vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr:hover{background:var(--panel2)}
+.empty{text-align:center;color:var(--faint);padding:34px!important}
+.link{color:var(--accent);text-decoration:none;font-weight:600}
+.link:hover{text-decoration:underline}
+.ellipsis{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* pills */
+.pill{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:700;text-transform:capitalize}
+.pill.pending{background:rgba(245,158,11,.16);color:#f59e0b}
+.pill.approved{background:rgba(59,130,246,.16);color:#3b82f6}
+.pill.rejected{background:rgba(239,68,68,.16);color:#ef4444}
+.pill.paid{background:var(--accent-soft);color:var(--accent)}
+.statussel.pending{color:#f59e0b}
+.statussel.approved{color:#3b82f6}
+.statussel.rejected{color:#ef4444}
+.statussel.paid{color:var(--accent)}
+
+/* banner */
+.banner{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3);
+  padding:11px 15px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:18px}
+
+.only-mobile{display:none}
+@media (max-width:860px){
+  .madx{flex-direction:column}
+  .sidebar{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;align-items:center;
+    gap:6px;padding:12px 14px;border-right:none;border-bottom:1px solid var(--border)}
+  .sidebar .brand{padding:0 8px 0 4px;border:none}
+  .nav{flex-direction:row;flex:1;margin:0;flex-wrap:wrap}
+  .navbtn{width:auto;padding:8px 12px}
+  .navbtn span:not(.navbadge){display:none}
+  .side-foot{flex-direction:row;border:none;padding:0;margin-left:auto}
+  .side-foot .navbtn span{display:none}
+  .main{padding:20px 16px 60px}
+  .page-title{font-size:24px}
+  .iconbtn{display:none}
+}
+`
