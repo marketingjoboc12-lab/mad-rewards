@@ -907,13 +907,28 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
   );
 };
 
-const CreatorDashboard = ({ user, campaigns, submissions, onSubmit, setView }) => {
-  const activeCampaigns = campaigns.filter((c) => c.active);
-  const featured = activeCampaigns[0];
+const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
   const mine = submissions.filter((s) => s.creatorId === user.id);
   const pending = mine.filter((s) => s.status === 'pending').length;
   const earned = mine.filter((s) => s.status === 'paid').reduce((sum, s) => sum + (s.payout || 0), 0);
   const pendingPayout = mine.filter((s) => s.status === 'approved').reduce((sum, s) => sum + (s.payout || 0), 0);
+
+  // ── Rewards calculator (driven by the active campaign) ──
+  const tiers = deal?.tiers || [];
+  const periodStart = deal?.starts_at ? new Date(deal.starts_at) : null;
+  const minePeriod = periodStart ? mine.filter((s) => new Date(s.submittedAt) >= periodStart) : mine;
+  const videoCount = minePeriod.length;
+  const totalViews = minePeriod.reduce((sum, s) => sum + (s.views || 0), 0);
+  const qualifies = (t) => (t.videos != null && videoCount >= t.videos) || (totalViews >= t.views);
+  let currentIdx = -1;
+  tiers.forEach((t, i) => { if (qualifies(t)) currentIdx = Math.max(currentIdx, i); });
+  const current = currentIdx >= 0 ? tiers[currentIdx] : null;
+  const next = tiers[currentIdx + 1] || null;
+  const viewsToNext = next ? Math.max(0, next.views - totalViews) : 0;
+  const videosToNext = next && next.videos != null ? Math.max(0, next.videos - videoCount) : null;
+  const nf = (n) => Number(n || 0).toLocaleString();
+  const progress = next ? Math.min(100, Math.round((totalViews / next.views) * 100)) : 100;
+  const examples = deal?.examples || [];
 
   return (
     <div className="space-y-10 md:space-y-12">
@@ -930,50 +945,92 @@ const CreatorDashboard = ({ user, campaigns, submissions, onSubmit, setView }) =
         <Stat label="In review" value={pending} icon={Inbox} />
       </div>
 
-      {featured && (
+      {/* ── REWARDS CALCULATOR ── */}
+      {deal ? (
         <Card className="relative overflow-hidden p-8 md:p-12 anim-fade-up anim-d-200">
           <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent" />
           <div className="relative">
-            <Badge status="active">This week's drop</Badge>
-            <h2 className="font-display font-extrabold text-3xl md:text-5xl mt-5 tracking-tight">{featured.title}</h2>
-            <p className="mt-4 text-[var(--text-dim)] max-w-lg leading-relaxed">{featured.description}</p>
+            <Badge status="active">{deal.cadence === 'monthly' ? "This month's rewards" : "This week's rewards"}</Badge>
+            <h2 className="font-display font-extrabold text-3xl md:text-5xl mt-5 tracking-tight">{deal.title}</h2>
 
-            <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-8 grid grid-cols-2 gap-4">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Base reward</div>
-                <div className="font-display font-bold text-2xl md:text-3xl text-[var(--accent)]">{fmtMoney(featured.reward)}</div>
-              </div>
-              {featured.bonus > 0 && (
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Top bonus</div>
-                  <div className="font-display font-bold text-2xl md:text-3xl">{fmtMoney(featured.bonus)}</div>
-                </div>
-              )}
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Closes in</div>
-                <div className="font-display font-bold text-2xl md:text-3xl">{daysLeft(featured.endDate)}d</div>
+                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your videos</div>
+                <div className="font-display font-bold text-3xl md:text-4xl">{videoCount}</div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Deadline</div>
-                <div className="font-display font-bold text-2xl md:text-3xl">{fmtDate(featured.endDate)}</div>
+                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your combined views</div>
+                <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(totalViews)}</div>
               </div>
             </div>
 
-            <ul className="mt-8 space-y-2.5">
-              {featured.requirements.map((r, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm">
-                  <span className="mt-0.5 w-4 h-4 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
-                    <Check size={11} strokeWidth={3} className="text-black" />
-                  </span>
-                  <span className="text-[var(--text)]">{r}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-8 p-5 rounded-2xl bg-[var(--elev2)] border border-[var(--border)]">
+              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">You've unlocked</div>
+              <div className="font-display font-bold text-2xl">{current ? current.reward_label : 'Nothing yet — keep posting'}</div>
+              {next ? (
+                <>
+                  <div className="mt-4 text-sm text-[var(--text-dim)]">
+                    Next: <span className="text-[var(--text)] font-semibold">{next.reward_label}</span> — {nf(viewsToNext)} more views
+                    {videosToNext != null && <> or {videosToNext} more videos</>}
+                  </div>
+                  <div className="mt-3 h-2 rounded-full bg-[var(--elev1)] overflow-hidden">
+                    <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${progress}%` }} />
+                  </div>
+                </>
+              ) : (
+                <div className="mt-4 text-sm font-semibold text-[var(--accent)]">Top tier reached. 🎉</div>
+              )}
+            </div>
+
+            {/* tier ladder */}
+            <div className="mt-8 space-y-2">
+              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-2">All tiers</div>
+              {tiers.map((t, i) => {
+                const hit = qualifies(t);
+                const isCurrent = i === currentIdx;
+                return (
+                  <div key={i} className={`flex items-center justify-between gap-3 p-3.5 rounded-xl border ${isCurrent ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : hit ? 'border-[var(--border)] bg-[var(--elev2)]' : 'border-[var(--border)] bg-[var(--elev1)] opacity-70'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${hit ? 'bg-[var(--accent)]' : 'bg-[var(--elev2)] border border-[var(--border)]'}`}>
+                        {hit ? <Check size={12} strokeWidth={3} className="text-black" /> : <Lock size={10} className="text-[var(--text-faint)]" />}
+                      </span>
+                      <span className="text-sm font-semibold">{t.reward_label}</span>
+                    </div>
+                    <span className="text-xs text-[var(--text-dim)] text-right">
+                      {t.videos != null && <>{t.videos} videos / </>}{nf(t.views)} views
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+        </Card>
+      ) : (
+        <Card className="p-8 text-center anim-fade-up anim-d-200">
+          <p className="text-sm text-[var(--text-dim)]">No active campaign right now. Check back soon.</p>
         </Card>
       )}
 
-      <SubmitForm user={user} campaigns={activeCampaigns} onSubmit={onSubmit} />
+      <SubmitForm user={user} onSubmit={onSubmit} />
+
+      {/* ── EXAMPLE VIDEOS ── */}
+      {examples.length > 0 && (
+        <div className="anim-fade-up anim-d-300">
+          <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight mb-5">Example videos</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {examples.map((x, i) => (
+              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer"
+                className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-[var(--border)] bg-[var(--elev2)] hover:border-[var(--border-strong)]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <PlatformIcon platform={detectPlatform(x)} />
+                  <span className="text-sm truncate">{x}</span>
+                </div>
+                <ExternalLink size={15} className="text-[var(--text-dim)] flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="anim-fade-up anim-d-400">
         <div className="flex items-center justify-between mb-5">
@@ -989,7 +1046,7 @@ const CreatorDashboard = ({ user, campaigns, submissions, onSubmit, setView }) =
           </Card>
         ) : (
           <div className="space-y-2.5">
-            {mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} campaign={campaigns.find((c) => c.id === s.campaignId)} />)}
+            {mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} campaign={null} />)}
           </div>
         )}
       </div>
@@ -997,23 +1054,20 @@ const CreatorDashboard = ({ user, campaigns, submissions, onSubmit, setView }) =
   );
 };
 
-const SubmitForm = ({ user, campaigns, onSubmit }) => {
-  const [campaignId, setCampaignId] = useState(campaigns[0]?.id || '');
+const SubmitForm = ({ user, onSubmit }) => {
   const [url, setUrl] = useState('');
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { if (!campaignId && campaigns[0]) setCampaignId(campaigns[0].id); }, [campaigns, campaignId]);
-
   const submit = async (e) => {
     e.preventDefault();
-    if (!url || !campaignId) return;
+    if (!url) return;
     setError('');
     setSuccess(false);
     setSubmitting(true);
     try {
-      await onSubmit({ creatorId: user.id, campaignId, url, platform: detectPlatform(url) });
+      await onSubmit({ creatorId: user.id, url, platform: detectPlatform(url) });
       setUrl('');
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2400);
@@ -1024,8 +1078,6 @@ const SubmitForm = ({ user, campaigns, onSubmit }) => {
     }
   };
 
-  if (campaigns.length === 0) return null;
-
   return (
     <Card className="p-6 md:p-8 anim-fade-up anim-d-300">
       <div className="flex items-center gap-3 mb-6">
@@ -1034,26 +1086,10 @@ const SubmitForm = ({ user, campaigns, onSubmit }) => {
         </div>
         <div>
           <h3 className="font-display font-bold text-xl tracking-tight">Submit a link</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-0.5">Pick a campaign and paste your video URL</p>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">Paste your TikTok or Instagram video URL</p>
         </div>
       </div>
       <form onSubmit={submit} className="space-y-5">
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Campaign</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {campaigns.map((c) => (
-              <button
-                type="button"
-                key={c.id}
-                onClick={() => setCampaignId(c.id)}
-                className={`text-left p-4 rounded-2xl border ${campaignId === c.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--border)] bg-[var(--elev2)] hover:border-[var(--border-strong)]'}`}
-              >
-                <div className="font-semibold text-sm">{c.title}</div>
-                <div className="text-xs text-[var(--text-dim)] mt-1">{fmtMoney(c.reward)} · closes {fmtDate(c.endDate)}</div>
-              </button>
-            ))}
-          </div>
-        </div>
         <Field
           label="Video URL"
           icon={LinkIcon}
@@ -1071,7 +1107,7 @@ const SubmitForm = ({ user, campaigns, onSubmit }) => {
           <div className="flex items-center gap-3 ml-auto">
             {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
             {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted</span>}
-            <Btn type="submit" disabled={!url || !campaignId || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit'}</Btn>
+            <Btn type="submit" disabled={!url || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit'}</Btn>
           </div>
         </div>
       </form>
@@ -1674,6 +1710,7 @@ const App = () => {
   const [creators, setCreators] = useState([]);
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [submissions, setSubmissions] = useState([]);
+  const [deal, setDeal] = useState(null); // the active reward campaign (tiers + examples)
 
   // ─── SUPABASE SERVICE LAYER ───
   // Recent submissions + creators load live. Campaigns stay local (no table).
@@ -1689,12 +1726,14 @@ const App = () => {
     if (typeof window !== 'undefined') console.info('[madrewards] talking to Supabase at:', SUPABASE_URL_IN_USE);
     (async () => {
       try {
-        const [subs, crs] = await Promise.all([
+        const [subs, crs, dl] = await Promise.all([
           supabase.from('video_submissions').select('*').order('created_at', { ascending: false }),
           supabase.from('creators').select('*').order('created_at', { ascending: false }),
+          supabase.from('campaigns').select('*').eq('active', true).limit(1).maybeSingle(),
         ]);
         if (!subs.error && subs.data) setSubmissions(subs.data.map(mapSubmissionRow));
         if (!crs.error && crs.data) setCreators(crs.data.map(mapCreatorRow));
+        if (!dl.error && dl.data) setDeal(dl.data);
       } catch (e) {
         console.error('[madrewards] initial load failed:', friendlyError(e));
       }
@@ -1790,7 +1829,7 @@ const App = () => {
   } else if (user) {
     body = (
       <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
-        {view === 'dash'    && <CreatorDashboard user={user} campaigns={campaigns} submissions={submissions} onSubmit={handleNewSubmission} setView={setView} />}
+        {view === 'dash'    && <CreatorDashboard user={user} deal={deal} submissions={submissions} onSubmit={handleNewSubmission} setView={setView} />}
         {view === 'rewards' && <CreatorRewards   campaigns={campaigns} />}
         {view === 'history' && <CreatorHistory   user={user} submissions={submissions} campaigns={campaigns} />}
       </CreatorShell>
