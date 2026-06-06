@@ -599,11 +599,11 @@ const REWARD_TEASERS = {
 };
 
 const BlurReward = ({ t }) => (
-  <Card className="relative overflow-hidden p-6 select-none min-h-[140px]">
+  <Card className="relative overflow-hidden p-5 sm:p-6 select-none min-h-[116px] sm:min-h-[140px]">
     <div className="pointer-events-none blur-[7px] opacity-80">
-      <div className="font-display font-extrabold text-3xl text-[var(--accent)]">{t.tag}</div>
-      <div className="font-semibold mt-2">{t.label}</div>
-      <div className="text-sm text-[var(--text-dim)] mt-1">{t.sub}</div>
+      <div className="font-display font-extrabold text-2xl sm:text-3xl text-[var(--accent)]">{t.tag}</div>
+      <div className="font-semibold mt-2 text-sm sm:text-base">{t.label}</div>
+      <div className="text-xs sm:text-sm text-[var(--text-dim)] mt-1">{t.sub}</div>
     </div>
     <div className="absolute inset-0 flex items-center justify-center">
       <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--elev1)]/90 border border-[var(--border)] px-3 py-1.5 rounded-full backdrop-blur-sm">
@@ -626,63 +626,63 @@ const LandingPage = ({ go, theme, setTheme }) => {
       </nav>
 
       {/* HERO */}
-      <header className="relative px-5 md:px-10 pt-10 md:pt-16 pb-10 md:pb-12 max-w-5xl mx-auto text-center">
+      <header className="relative px-5 md:px-10 pt-8 md:pt-16 pb-8 md:pb-12 max-w-5xl mx-auto text-center">
         <div className="absolute inset-0 glow-accent pointer-events-none" />
         <div className="relative">
-          <div className="anim-fade-up inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--elev1)] text-xs text-[var(--text-dim)] mb-8">
+          <div className="anim-fade-up inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--elev1)] text-xs text-[var(--text-dim)] mb-6 md:mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] pulse-soft" />
             Invite-only creator program
           </div>
-          <h1 className="font-display font-extrabold text-[20vw] sm:text-[104px] md:text-[148px] leading-[0.86] tracking-[-0.04em]">
+          <h1 className="font-display font-extrabold text-[19vw] sm:text-[104px] md:text-[148px] leading-[0.86] tracking-[-0.04em]">
             <span className="hero-line hero-line-1">Post.</span>
             <span className="hero-line hero-line-2">Earn.</span>
             <span className="hero-line hero-line-3 text-[var(--accent)]">Repeat.</span>
           </h1>
-          <p className="anim-fade-up anim-d-400 mt-8 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
+          <p className="anim-fade-up anim-d-400 mt-6 md:mt-8 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
             Post content. Hit goals. Earn rewards every week. Mad Rewards is invite-only.
           </p>
         </div>
       </header>
 
+      {/* BLURRED — THIS WEEK */}
+      <section className="relative px-5 md:px-10 pb-10 md:pb-14 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-4 md:mb-5">
+          <h2 className="font-display font-bold text-xl md:text-3xl tracking-tight">Active rewards — this week</h2>
+          <Badge status="active">Live</Badge>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+          {REWARD_TEASERS.week.map((t, i) => <BlurReward key={i} t={t} />)}
+        </div>
+      </section>
+
+      {/* BLURRED — THIS MONTH */}
+      <section className="relative px-5 md:px-10 pb-10 md:pb-14 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-4 md:mb-5">
+          <h2 className="font-display font-bold text-xl md:text-3xl tracking-tight">Active rewards — this month</h2>
+          <Badge status="active">Live</Badge>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+          {REWARD_TEASERS.month.map((t, i) => <BlurReward key={i} t={t} />)}
+        </div>
+        <p className="text-center text-sm text-[var(--text-dim)] mt-6 md:mt-8">Sign in to unlock the full reward ladder and track your progress.</p>
+      </section>
+
       {/* TWO DOORS */}
-      <section className="relative px-5 md:px-10 pb-16 md:pb-20 max-w-3xl mx-auto">
+      <section className="relative px-5 md:px-10 pb-16 md:pb-24 max-w-3xl mx-auto">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Card interactive onClick={() => go('invite')} className="p-7 text-center cursor-pointer">
+          <Card interactive onClick={() => go('invite')} className="p-6 md:p-7 text-center cursor-pointer">
             <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] text-black flex items-center justify-center mx-auto mb-4"><Ticket size={20} /></div>
             <h3 className="font-display font-bold text-xl">Have an invite code?</h3>
             <p className="text-sm text-[var(--text-dim)] mt-2">Enter your one-time code and set up your account.</p>
             <div className="mt-5"><Btn className="w-full" iconRight={ArrowRight}>Enter code</Btn></div>
           </Card>
-          <Card interactive onClick={() => go('request')} className="p-7 text-center cursor-pointer">
+          <Card interactive onClick={() => go('request')} className="p-6 md:p-7 text-center cursor-pointer">
             <div className="w-12 h-12 rounded-2xl bg-[var(--elev2)] text-[var(--accent)] flex items-center justify-center mx-auto mb-4"><Mail size={20} /></div>
             <h3 className="font-display font-bold text-xl">Want in?</h3>
             <p className="text-sm text-[var(--text-dim)] mt-2">Request an invite. If you're a fit, we'll send you a code.</p>
             <div className="mt-5"><Btn variant="outline" className="w-full" iconRight={ArrowRight}>Request an invite</Btn></div>
           </Card>
         </div>
-      </section>
-
-      {/* BLURRED — THIS WEEK */}
-      <section className="relative px-5 md:px-10 pb-14 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display font-bold text-2xl md:text-3xl tracking-tight">Active rewards — this week</h2>
-          <Badge status="active">Live</Badge>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {REWARD_TEASERS.week.map((t, i) => <BlurReward key={i} t={t} />)}
-        </div>
-      </section>
-
-      {/* BLURRED — THIS MONTH */}
-      <section className="relative px-5 md:px-10 pb-24 max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display font-bold text-2xl md:text-3xl tracking-tight">Active rewards — this month</h2>
-          <Badge status="active">Live</Badge>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {REWARD_TEASERS.month.map((t, i) => <BlurReward key={i} t={t} />)}
-        </div>
-        <p className="text-center text-sm text-[var(--text-dim)] mt-8">Sign in to unlock the full reward ladder and track your progress.</p>
       </section>
 
       {/* FOOTER */}
