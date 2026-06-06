@@ -643,7 +643,14 @@ const LandingPage = ({ go, theme, setTheme }) => {
           </p>
         </div>
       </header>
-
+{/* CREATOR VIDEOS — auto-scrolling carousel */}
+      <section className="relative pb-10 md:pb-14">
+        <div className="flex items-center justify-between mb-4 md:mb-5 px-5 md:px-10 max-w-6xl mx-auto">
+          <h2 className="font-display font-bold text-xl md:text-3xl tracking-tight">Creators on TikTok</h2>
+          <Badge status="active">Live</Badge>
+        </div>
+        <VideoCarousel />
+      </section>
       {/* BLURRED — THIS WEEK */}
       <section className="relative px-5 md:px-10 pb-10 md:pb-14 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-4 md:mb-5">
