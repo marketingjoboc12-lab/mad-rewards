@@ -10,12 +10,15 @@ type Creator = {
 type Submission = {
   id: string; creator_id: string; video_url: string; platform: string
   status: string; views: number; paid: boolean; reward_amount: number; created_at: string
+  posted_at?: string | null; claimed_views?: number
 }
 type Tier = { videos: number | null; views: number; reward_label: string; reward_amount: number }
 type Campaign = {
   id?: string; title: string; active: boolean; cadence: string
   starts_at: string; tiers: Tier[]; examples: string[]
 }
+type Invite = { id: string; code: string; note: string | null; used: boolean; used_email: string | null; created_at: string; used_at: string | null }
+type ReqRow = { id: string; name: string; email: string; tiktok_handle: string | null; instagram_handle: string | null; note: string | null; status: string; invite_code: string | null; created_at: string }
 
 const STATUS = ['pending', 'approved', 'rejected', 'paid']
 
@@ -49,6 +52,9 @@ const Ico = {
   check: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3',
   spark: 'M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4',
   trophy: 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z',
+  ticket: 'M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4zM13 5v2M13 17v2M13 11v2',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  copy: 'M20 9H11a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
 }
 function Icon({ d, size = 18 }: { d: string; size?: number }) {
   return (
@@ -64,12 +70,15 @@ export default function AdminPage() {
   const [creators, setCreators] = useState<Creator[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [invites, setInvites] = useState<Invite[]>([])
+  const [requests, setRequests] = useState<ReqRow[]>([])
   const [editing, setEditing] = useState<Campaign | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [tab, setTab] = useState<'overview' | 'campaign' | 'creators' | 'submissions'>('overview')
+  const [tab, setTab] = useState<'overview' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
+  const [copied, setCopied] = useState('')
 
   const call = async (payload: object) => {
     const res = await fetch('/api/admin', {
@@ -86,6 +95,8 @@ export default function AdminPage() {
     setCreators(data.creators ?? [])
     setSubmissions(data.submissions ?? [])
     setCampaigns(data.campaigns ?? [])
+    setInvites(data.invites ?? [])
+    setRequests(data.requests ?? [])
   }
 
   const login = async (e: React.FormEvent) => {
@@ -132,6 +143,29 @@ export default function AdminPage() {
 
   const creatorFor = (cid: string) => creators.find((c) => c.id === cid)
 
+  // ----- invites & requests -----
+  const copy = (text: string) => {
+    try { navigator.clipboard.writeText(text); setCopied(text); setTimeout(() => setCopied(''), 1500) } catch {}
+  }
+  const genInvite = async () => {
+    setError('')
+    try { await call({ action: 'invite_create' }); await load() } catch (err: any) { setError(err.message) }
+  }
+  const delInvite = async (id: string) => {
+    setError('')
+    try { await call({ action: 'invite_delete', id }); await load() } catch (err: any) { setError(err.message) }
+  }
+  const approveReq = async (id: string) => {
+    setError('')
+    try { const r = await call({ action: 'request_approve', id }); await load(); if (r.code) { copy(r.code); alert(`Approved. Invite code copied:\n\n${r.code}\n\nSend it to them directly.`) } }
+    catch (err: any) { setError(err.message) }
+  }
+  const declineReq = async (id: string) => {
+    if (!confirm('Decline this request?')) return
+    setError('')
+    try { await call({ action: 'request_decline', id }); await load() } catch (err: any) { setError(err.message) }
+  }
+
   const dark = theme === 'dark'
   const vars: any = dark ? {
     '--bg': '#0a0a0b', '--bg2': '#0f0f11', '--panel': '#141417', '--panel2': '#1b1b1f',
@@ -172,14 +206,19 @@ export default function AdminPage() {
   const owed = submissions.filter((s) => !s.paid && (s.status === 'approved' || s.status === 'paid')).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
   const activeCampaign = campaigns.find((c) => c.active)
 
+  const pendingReqs = requests.filter((r) => r.status === 'pending').length
+  const unusedInvites = invites.filter((i) => !i.used).length
+
   const nav = [
     { id: 'overview', label: 'Overview', d: Ico.grid },
     { id: 'campaign', label: 'Campaign', d: Ico.gift, badge: campaigns.length || undefined },
+    { id: 'requests', label: 'Requests', d: Ico.inbox, badge: pendingReqs || undefined },
+    { id: 'invites', label: 'Invites', d: Ico.ticket, badge: unusedInvites || undefined },
     { id: 'creators', label: 'Creators', d: Ico.users, badge: creators.length || undefined },
     { id: 'submissions', label: 'Submissions', d: Ico.film, badge: pending || undefined },
   ] as const
 
-  const titleFor: Record<string, string> = { overview: 'Overview', campaign: 'Campaign', creators: 'Creators', submissions: 'Video submissions' }
+  const titleFor: Record<string, string> = { overview: 'Overview', campaign: 'Campaign', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests' }
 
   return (
     <div className="madx" style={vars}>
@@ -417,7 +456,7 @@ export default function AdminPage() {
           <div className="card table-scroll">
             <table className="tbl">
               <thead><tr>
-                <th>Creator</th><th>Video</th><th>Platform</th><th>Submitted</th><th>Views</th><th>Status</th><th>Reward</th><th>Paid</th>
+                <th>Creator</th><th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th><th>Reward</th><th>Paid</th>
               </tr></thead>
               <tbody>
                 {submissions.map((s) => {
@@ -432,7 +471,9 @@ export default function AdminPage() {
                         <a href={toUrl(s.video_url)} target="_blank" rel="noreferrer" className="link ellipsis">{s.video_url}</a>
                       </td>
                       <td className="muted" style={{ textTransform: 'capitalize' }}>{s.platform}</td>
+                      <td className="muted">{s.posted_at ? fmtDate(s.posted_at) : '—'}</td>
                       <td className="muted">{fmtDate(s.created_at)}</td>
+                      <td className="muted">{num(s.claimed_views || 0)}</td>
                       <td><input type="number" defaultValue={s.views} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
                       <td>
                         <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
@@ -449,10 +490,85 @@ export default function AdminPage() {
                     </tr>
                   )
                 })}
-                {submissions.length === 0 && <tr><td className="empty" colSpan={8}>No submissions yet.</td></tr>}
+                {submissions.length === 0 && <tr><td className="empty" colSpan={10}>No submissions yet.</td></tr>}
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* ===== REQUESTS ===== */}
+        {tab === 'requests' && (
+          <div className="card table-scroll">
+            <table className="tbl">
+              <thead><tr><th>Name</th><th>Email</th><th>TikTok</th><th>Instagram</th><th>Pitch</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ fontWeight: 600 }}>{r.name}</td>
+                    <td className="muted">{r.email}</td>
+                    <td>{r.tiktok_handle || '—'}</td>
+                    <td>{r.instagram_handle || '—'}</td>
+                    <td className="muted" style={{ maxWidth: 240 }}><span className="ellipsis" title={r.note || ''}>{r.note || '—'}</span></td>
+                    <td>
+                      <span className={`pill ${r.status === 'approved' ? 'paid' : r.status === 'declined' ? 'rejected' : 'pending'}`}>{r.status}</span>
+                      {r.status === 'approved' && r.invite_code && (
+                        <button className="codechip" onClick={() => copy(r.invite_code!)} title="Copy code">{copied === r.invite_code ? 'Copied!' : r.invite_code}</button>
+                      )}
+                    </td>
+                    <td className="muted">{fmtDate(r.created_at)}</td>
+                    <td>
+                      {r.status === 'pending' ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-primary sm" onClick={() => approveReq(r.id)}>Approve</button>
+                          <button className="btn btn-ghost danger sm" onClick={() => declineReq(r.id)}>Decline</button>
+                        </div>
+                      ) : <span className="muted" style={{ fontSize: 13 }}>—</span>}
+                    </td>
+                  </tr>
+                ))}
+                {requests.length === 0 && <tr><td className="empty" colSpan={8}>No signup requests yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ===== INVITES ===== */}
+        {tab === 'invites' && (
+          <>
+            <div className="card pad" style={{ marginBottom: 16 }}>
+              <div className="row-between">
+                <div>
+                  <div className="card-h">One-time invite codes</div>
+                  <div className="muted" style={{ marginTop: 4 }}>Generate a code and send it to one creator. Each works once.</div>
+                </div>
+                <button className="btn btn-primary" onClick={genInvite}><Icon d={Ico.ticket} size={16} />Generate code</button>
+              </div>
+            </div>
+            <div className="card table-scroll">
+              <table className="tbl">
+                <thead><tr><th>Code</th><th>For</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                <tbody>
+                  {invites.map((i) => (
+                    <tr key={i.id}>
+                      <td><span className="codemono">{i.code}</span></td>
+                      <td className="muted">{i.note || '—'}</td>
+                      <td>{i.used ? <span className="pill approved">used{i.used_email ? ` · ${i.used_email}` : ''}</span> : <span className="pill paid">available</span>}</td>
+                      <td className="muted">{fmtDate(i.created_at)}</td>
+                      <td>
+                        {!i.used ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-ghost sm" onClick={() => copy(i.code)}><Icon d={Ico.copy} size={14} />{copied === i.code ? 'Copied!' : 'Copy'}</button>
+                            <button className="btn btn-ghost danger sm" onClick={() => delInvite(i.id)}>Delete</button>
+                          </div>
+                        ) : <span className="muted" style={{ fontSize: 13 }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                  {invites.length === 0 && <tr><td className="empty" colSpan={5}>No codes yet. Generate one above.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </main>
     </div>
@@ -584,6 +700,13 @@ select.input{cursor:pointer}
   padding:11px 15px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:18px}
 
 .only-mobile{display:none}
+
+/* invite codes */
+.codemono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;letter-spacing:.04em;
+  background:var(--accent-soft);color:var(--accent);padding:5px 11px;border-radius:9px;font-size:14px;white-space:nowrap}
+.codechip{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;font-size:12px;margin-left:8px;
+  background:var(--accent-soft);color:var(--accent);padding:3px 9px;border-radius:8px;border:none;cursor:pointer}
+.codechip:hover{filter:brightness(1.1)}
 
 /* hero */
 .hero{position:relative;overflow:hidden;border-radius:22px;padding:34px 34px 30px;margin-bottom:22px;
