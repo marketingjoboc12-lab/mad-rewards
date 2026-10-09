@@ -1,6 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import {
+  VIEW_TIERS, POSTING_BONUSES, MONTHLY_PRIZES, LOGO_PFP_BONUS,
+  computeWeek, computeMonth, lastClosedWeek, weekStart, monthStart, addDays,
+  weekLabel, monthLabel, todayLocal, type SubLike,
+} from '@/lib/rewards'
 
 type Creator = {
   id: string; name: string; email: string
@@ -13,25 +18,18 @@ type Submission = {
   status: string; views: number; paid: boolean; reward_amount: number; created_at: string
   posted_at?: string | null; claimed_views?: number
 }
-type Tier = { videos: number | null; views: number; reward_label: string; reward_amount: number }
 type Campaign = {
   id?: string; title: string; active: boolean; cadence: string
-  starts_at: string; tiers: Tier[]; examples: string[]
+  starts_at: string; tiers: any[]; examples: string[]
 }
+type Payout = { id: string; creator_id: string; period: 'week' | 'month'; period_start: string; amount: number; label: string | null; details: any; paid_at: string }
 type Invite = { id: string; code: string; note: string | null; used: boolean; used_email: string | null; created_at: string; used_at: string | null }
 type ReqRow = { id: string; name: string; email: string; tiktok_handle: string | null; instagram_handle: string | null; note: string | null; status: string; invite_code: string | null; created_at: string }
 
-const STATUS = ['pending', 'approved', 'rejected', 'paid']
+const STATUS = ['pending', 'approved', 'rejected']
 
-// Your proposed ladder, used as the starting point for a new campaign.
-const DEFAULT_TIERS: Tier[] = [
-  { videos: 20, views: 50000, reward_label: 'Re-up (more product)', reward_amount: 0 },
-  { videos: 30, views: 100000, reward_label: '$100', reward_amount: 100 },
-  { videos: 40, views: 200000, reward_label: '$200', reward_amount: 200 },
-  { videos: null, views: 500000, reward_label: '$300', reward_amount: 300 },
-  { videos: null, views: 700000, reward_label: '$350 + duffle bag', reward_amount: 350 },
-  { videos: null, views: 1000000, reward_label: '$350 + Mega device', reward_amount: 350 },
-]
+const posted = (s: Submission) => (s.posted_at || s.created_at || '').slice(0, 10)
+const toSubLike = (s: Submission): SubLike => ({ posted: posted(s), status: s.status, views: s.views, claimedViews: s.claimed_views || 0 })
 
 const fmtDate = (s: string) => { if (!s) return '—'; try { return new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return s } }
 const money = (n: number) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
@@ -84,12 +82,18 @@ export default function AdminPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
   const [requests, setRequests] = useState<ReqRow[]>([])
+  const [payouts, setPayouts] = useState<Payout[]>([])
+  const [payWeek, setPayWeek] = useState(() => lastClosedWeek())
+  const [payMonth, setPayMonth] = useState(() => monthStart(addDays(monthStart(todayLocal()), -1)))
+  const [subWeek, setSubWeek] = useState<string>('all')
+  const [pfp, setPfp] = useState<Record<string, boolean>>({})
+  const [paying, setPaying] = useState('')
   const [editing, setEditing] = useState<Campaign | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [tab, setTab] = useState<'overview' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
+  const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
   const [copied, setCopied] = useState('')
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
 
@@ -110,6 +114,7 @@ export default function AdminPage() {
     setCampaigns(data.campaigns ?? [])
     setInvites(data.invites ?? [])
     setRequests(data.requests ?? [])
+    setPayouts(data.payouts ?? [])
   }
 
   const login = async (e: React.FormEvent) => {
@@ -123,11 +128,22 @@ export default function AdminPage() {
     try { await call({ action: 'update', id, patch }) } catch (err: any) { setError(err.message) }
   }
 
-  // ----- campaign editing -----
+  // ----- payouts -----
+  const markPaid = async (payload: { creator_id: string; period: 'week' | 'month'; period_start: string; amount: number; label: string; details?: any }) => {
+    setError(''); setPaying(payload.creator_id + payload.period)
+    try { await call({ action: 'mark_paid', ...payload }); await load() } catch (err: any) { setError(err.message) } finally { setPaying('') }
+  }
+  const unmarkPaid = async (id: string) => {
+    if (!confirm('Undo this payment? The videos go back to "approved".')) return
+    setError('')
+    try { await call({ action: 'unmark_paid', id }); await load() } catch (err: any) { setError(err.message) }
+  }
+
+  // ----- campaign editing (title + example videos; reward numbers live in lib/rewards.ts) -----
   const newCampaign = () => { setEditing({
-    title: 'This Week', active: true, cadence: 'weekly',
+    title: 'Mad Rewards', active: true, cadence: 'weekly',
     starts_at: new Date().toISOString().slice(0, 10),
-    tiers: DEFAULT_TIERS.map((t) => ({ ...t })), examples: [],
+    tiers: [], examples: [],
   }); setTab('campaign') }
   const editCampaign = (c: Campaign) => { setEditing({
     ...c, starts_at: (c.starts_at || '').slice(0, 10),
@@ -146,10 +162,6 @@ export default function AdminPage() {
     try { await call({ action: 'campaign_delete', id: editing.id }); await load(); setEditing(null) }
     catch (err: any) { setError(err.message) } finally { setSaving(false) }
   }
-  const setTier = (i: number, patch: Partial<Tier>) =>
-    setEditing((e) => e ? { ...e, tiers: e.tiers.map((t, idx) => idx === i ? { ...t, ...patch } : t) } : e)
-  const addTier = () => setEditing((e) => e ? { ...e, tiers: [...e.tiers, { videos: null, views: 0, reward_label: '', reward_amount: 0 }] } : e)
-  const removeTier = (i: number) => setEditing((e) => e ? { ...e, tiers: e.tiers.filter((_, idx) => idx !== i) } : e)
   const setExample = (i: number, v: string) => setEditing((e) => e ? { ...e, examples: e.examples.map((x, idx) => idx === i ? v : x) } : e)
   const addExample = () => setEditing((e) => e ? { ...e, examples: [...e.examples, ''] } : e)
   const removeExample = (i: number) => setEditing((e) => e ? { ...e, examples: e.examples.filter((_, idx) => idx !== i) } : e)
@@ -215,15 +227,34 @@ export default function AdminPage() {
 
   const pending = submissions.filter((s) => s.status === 'pending').length
   const approved = submissions.filter((s) => s.status === 'approved').length
-  const paidOut = submissions.filter((s) => s.paid).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
-  const owed = submissions.filter((s) => !s.paid && (s.status === 'approved' || s.status === 'paid')).reduce((a, s) => a + (Number(s.reward_amount) || 0), 0)
   const activeCampaign = campaigns.find((c) => c.active)
+
+  // ----- weekly pay sheet -----
+  const subsBy = (cid: string) => submissions.filter((s) => s.creator_id === cid).map(toSubLike)
+  const paidRow = (cid: string, period: 'week' | 'month', start: string) =>
+    payouts.find((p) => p.creator_id === cid && p.period === period && p.period_start === start)
+  const weekRows = creators.map((c) => {
+    const w = computeWeek(subsBy(c.id), payWeek)
+    const logo = !!pfp[c.id + payWeek]
+    return { c, w, logo, total: w.total + (logo && w.videos > 0 ? LOGO_PFP_BONUS : 0), paid: paidRow(c.id, 'week', payWeek) }
+  }).filter((r) => r.w.videos > 0 || r.w.pending > 0 || r.paid)
+  const weekTotal = weekRows.reduce((a, r) => a + (r.paid ? Number(r.paid.amount) : r.total), 0)
+  const weekPendingVideos = weekRows.reduce((a, r) => a + r.w.pending, 0)
+  const monthRows = creators.map((c) => ({ c, m: computeMonth(subsBy(c.id), payMonth), paid: paidRow(c.id, 'month', payMonth) }))
+    .filter((r) => r.m.views > 0).sort((a, b) => b.m.views - a.m.views)
+
+  const paidOut = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0)
+  const lastWeek = lastClosedWeek()
+  const owed = creators.reduce((a, c) => paidRow(c.id, 'week', lastWeek) ? a : a + computeWeek(subsBy(c.id), lastWeek).total, 0)
+
+  const subsShown = subWeek === 'all' ? submissions : submissions.filter((s) => weekStart(posted(s)) === subWeek)
+  const weekOptions = Array.from(new Set(submissions.map((s) => weekStart(posted(s))).filter(Boolean))).sort().reverse()
 
   // group submissions by creator + compute stats
   const dayKey = (s: Submission) => (s.posted_at || s.created_at || '').slice(0, 10)
   const subGroups = (() => {
     const map = new Map<string, Submission[]>()
-    for (const s of submissions) {
+    for (const s of subsShown) {
       const arr = map.get(s.creator_id) || []
       arr.push(s); map.set(s.creator_id, arr)
     }
@@ -246,15 +277,16 @@ export default function AdminPage() {
   const unusedInvites = invites.filter((i) => !i.used).length
 
   const nav = [
-    { id: 'overview', label: 'Overview', d: Ico.grid },
-    { id: 'campaign', label: 'Campaign', d: Ico.gift, badge: campaigns.length || undefined },
+    { id: 'overview', label: 'Overview', d: Ico.grid, badge: undefined },
+    { id: 'submissions', label: 'Submissions', d: Ico.film, badge: pending || undefined },
+    { id: 'payouts', label: 'Weekly pay', d: Ico.wallet, badge: undefined },
+    { id: 'campaign', label: 'Rewards', d: Ico.gift, badge: undefined },
     { id: 'requests', label: 'Requests', d: Ico.inbox, badge: pendingReqs || undefined },
     { id: 'invites', label: 'Invites', d: Ico.ticket, badge: unusedInvites || undefined },
     { id: 'creators', label: 'Creators', d: Ico.users, badge: creators.length || undefined },
-    { id: 'submissions', label: 'Submissions', d: Ico.film, badge: pending || undefined },
   ] as const
 
-  const titleFor: Record<string, string> = { overview: 'Overview', campaign: 'Campaign', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests' }
+  const titleFor: Record<string, string> = { overview: 'Overview', payouts: 'Weekly pay', campaign: 'Rewards', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests' }
 
   return (
     <div className="madx" style={vars}>
@@ -311,13 +343,11 @@ export default function AdminPage() {
                 <div className="hero-kick">Mad Rewards · Control room</div>
                 <h2 className="hero-h">Welcome back.</h2>
                 <p className="hero-sub">
-                  {activeCampaign
-                    ? <>“{activeCampaign.title}” is live — {(activeCampaign.tiers || []).length} tiers, {activeCampaign.cadence}, since {fmtDate(activeCampaign.starts_at)}.</>
-                    : <>No campaign is live. Creators see nothing until you launch one.</>}
+                  Week closes Saturday 11:59pm (Sunday is a grace day). Verify views Monday, then pay from the Weekly pay tab.
                 </p>
                 <div className="hero-cta">
-                  <button className="btn btn-primary" onClick={() => setTab('campaign')}>{activeCampaign ? 'Manage campaign' : 'Launch a campaign'}</button>
-                  <button className="btn btn-ghost glassy" onClick={() => setTab('submissions')}>Review submissions{pending ? ` (${pending})` : ''}</button>
+                  <button className="btn btn-primary" onClick={() => setTab('submissions')}>Review submissions{pending ? ` (${pending})` : ''}</button>
+                  <button className="btn btn-ghost glassy" onClick={() => setTab('payouts')}>Weekly pay</button>
                 </div>
               </div>
             </div>
@@ -332,7 +362,7 @@ export default function AdminPage() {
                 <div className="bar"><span style={{ width: `${paidOut + owed > 0 ? Math.round((paidOut / (paidOut + owed)) * 100) : 0}%` }} /></div>
                 <div className="feat-figs">
                   <div><div className="feat-big">{money(paidOut)}</div><div className="feat-cap">paid out</div></div>
-                  <div className="right"><div className="feat-big">{money(owed)}</div><div className="feat-cap">still owed</div></div>
+                  <div className="right"><div className="feat-big">{money(owed)}</div><div className="feat-cap">owed for {weekLabel(lastWeek)}</div></div>
                 </div>
               </div>
 
@@ -378,91 +408,172 @@ export default function AdminPage() {
           </>
         )}
 
-        {/* ===== CAMPAIGN ===== */}
+        {/* ===== REWARDS (read-only rules + example videos) ===== */}
         {tab === 'campaign' && (
-          <div className="card pad">
-            <div className="row-between" style={{ marginBottom: 16 }}>
-              <div className="card-h">Reward campaign</div>
-              {!editing && <button onClick={newCampaign} className="btn btn-primary">+ New campaign</button>}
+          <>
+            <div className="card pad" style={{ marginBottom: 16 }}>
+              <div className="card-h">Reward rules</div>
+              <p className="muted" style={{ marginTop: 4 }}>These numbers live in <code>lib/rewards.ts</code>. Creators see the same ones.</p>
+              <div className="rules-grid">
+                <div>
+                  <div className="flabel">Weekly views (highest tier only)</div>
+                  {VIEW_TIERS.map((t) => <div key={t.views} className="rule-row"><span>{num(t.views)} views</span><b>{t.label}</b></div>)}
+                </div>
+                <div>
+                  <div className="flabel">Posting bonus (stacks)</div>
+                  {POSTING_BONUSES.map((b) => <div key={b.videos} className="rule-row"><span>{b.videos}+ videos on {b.days === 7 ? 'all 7' : `${b.days}+`} days</span><b>{b.label}</b></div>)}
+                  <div className="rule-row"><span>Mad Labs logo as profile pic</span><b>+{money(LOGO_PFP_BONUS)}/week</b></div>
+                  <div className="flabel" style={{ marginTop: 16 }}>Monthly prizes</div>
+                  {MONTHLY_PRIZES.map((p) => <div key={p.views} className="rule-row"><span>{num(p.views)} views in a month</span><b>{p.label}</b></div>)}
+                </div>
+              </div>
             </div>
 
-            {!editing && (
-              <div>
-                {campaigns.length === 0 && <p className="muted">No campaigns yet. Create one to set the reward tiers creators see.</p>}
-                {campaigns.map((c) => (
-                  <div key={c.id} className="list-row">
-                    <div>
-                      <span style={{ fontWeight: 700 }}>{c.title}</span>
-                      <span className="muted" style={{ marginLeft: 10, fontSize: 13 }}>{c.cadence} · {(c.tiers || []).length} tiers · from {fmtDate(c.starts_at)}</span>
-                      {c.active && <span className="pill paid" style={{ marginLeft: 10 }}>active</span>}
+            <div className="card pad">
+              <div className="row-between" style={{ marginBottom: 16 }}>
+                <div>
+                  <div className="card-h">Example videos</div>
+                  <div className="muted" style={{ marginTop: 4 }}>Shown on every creator's dashboard.</div>
+                </div>
+                {!editing && <button onClick={() => (activeCampaign ? editCampaign(activeCampaign) : newCampaign())} className="btn btn-primary">Edit examples</button>}
+              </div>
+              {!editing && (activeCampaign?.examples?.length
+                ? activeCampaign.examples.map((x, i) => <div key={i} className="list-row"><a href={toUrl(x)} target="_blank" rel="noreferrer" className="link ellipsis">{x}</a></div>)
+                : <p className="muted">No example videos yet.</p>)}
+              {editing && (
+                <div>
+                  {editing.examples.map((x, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <input value={x} placeholder="https://www.tiktok.com/@..." onChange={(e) => setExample(i, e.target.value)} className="input" style={{ flex: 1 }} />
+                      <button onClick={() => removeExample(i)} className="btn btn-ghost danger">Remove</button>
                     </div>
-                    <button onClick={() => editCampaign(c)} className="btn btn-ghost">Edit</button>
+                  ))}
+                  <button onClick={addExample} className="btn btn-ghost">+ Add example</button>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 22, alignItems: 'center' }}>
+                    <button onClick={saveCampaign} disabled={saving} className="btn btn-primary">{saving ? 'Saving…' : 'Save'}</button>
+                    <button onClick={() => setEditing(null)} className="btn btn-ghost">Cancel</button>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {editing && (
-              <div>
-                <div className="form-row">
-                  <label className="field" style={{ flex: '1 1 220px' }}>
-                    <span className="flabel">Title</span>
-                    <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} className="input" style={{ width: '100%' }} />
-                  </label>
-                  <label className="field">
-                    <span className="flabel">Cadence</span>
-                    <select value={editing.cadence} onChange={(e) => setEditing({ ...editing, cadence: e.target.value })} className="input">
-                      <option value="weekly">weekly</option><option value="monthly">monthly</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span className="flabel">Starts</span>
-                    <input type="date" value={editing.starts_at} onChange={(e) => setEditing({ ...editing, starts_at: e.target.value })} className="input" />
-                  </label>
-                  <label className="field check">
-                    <input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />
-                    <span>Active (shown to creators)</span>
-                  </label>
                 </div>
+              )}
+            </div>
+          </>
+        )}
 
-                <div className="flabel" style={{ marginTop: 18, marginBottom: 8 }}>Reward tiers</div>
-                <div className="table-scroll">
-                  <table className="tbl tiers">
-                    <thead><tr>
-                      <th>Videos / week</th><th>Or views</th><th>Reward label</th><th>$ amount</th><th></th>
-                    </tr></thead>
-                    <tbody>
-                      {editing.tiers.map((t, i) => (
-                        <tr key={i}>
-                          <td><input type="number" value={t.videos ?? ''} placeholder="—" onChange={(e) => setTier(i, { videos: e.target.value === '' ? null : Number(e.target.value) })} className="input sm" /></td>
-                          <td><input type="number" value={t.views} onChange={(e) => setTier(i, { views: Number(e.target.value) })} className="input" style={{ width: 120 }} /></td>
-                          <td><input value={t.reward_label} onChange={(e) => setTier(i, { reward_label: e.target.value })} className="input" style={{ width: 190 }} /></td>
-                          <td><input type="number" value={t.reward_amount} onChange={(e) => setTier(i, { reward_amount: Number(e.target.value) })} className="input sm" /></td>
-                          <td><button onClick={() => removeTier(i)} className="btn btn-ghost danger sm">Remove</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <button onClick={addTier} className="btn btn-ghost" style={{ marginTop: 10 }}>+ Add tier</button>
-
-                <div className="flabel" style={{ marginTop: 22, marginBottom: 8 }}>Example video links</div>
-                {editing.examples.map((x, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                    <input value={x} placeholder="https://www.tiktok.com/@..." onChange={(e) => setExample(i, e.target.value)} className="input" style={{ flex: 1 }} />
-                    <button onClick={() => removeExample(i)} className="btn btn-ghost danger">Remove</button>
+        {/* ===== WEEKLY PAY ===== */}
+        {tab === 'payouts' && (
+          <>
+            <div className="card pad" style={{ marginBottom: 16 }}>
+              <div className="row-between">
+                <div>
+                  <div className="card-h">Week of {weekLabel(payWeek)}</div>
+                  <div className="muted" style={{ marginTop: 4 }}>
+                    Only verified (approved) views count. Total this week: <b style={{ color: 'var(--text)' }}>{money(weekTotal)}</b>
                   </div>
-                ))}
-                <button onClick={addExample} className="btn btn-ghost">+ Add example</button>
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 22, alignItems: 'center' }}>
-                  <button onClick={saveCampaign} disabled={saving} className="btn btn-primary">{saving ? 'Saving…' : 'Save campaign'}</button>
-                  <button onClick={() => setEditing(null)} className="btn btn-ghost">Cancel</button>
-                  {editing.id && <button onClick={deleteCampaign} className="btn btn-ghost danger" style={{ marginLeft: 'auto' }}>Delete</button>}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost sm" onClick={() => setPayWeek(addDays(payWeek, -7))}>← Prev</button>
+                  <button className="btn btn-ghost sm" onClick={() => setPayWeek(lastClosedWeek())}>Last week</button>
+                  <button className="btn btn-ghost sm" onClick={() => setPayWeek(addDays(payWeek, 7))}>Next →</button>
                 </div>
               </div>
-            )}
-          </div>
+              {weekPendingVideos > 0 && (
+                <div className="banner" style={{ marginTop: 14, marginBottom: 0 }}>
+                  {weekPendingVideos} video{weekPendingVideos > 1 ? 's' : ''} from this week still pending. Review them in Submissions before paying.
+                </div>
+              )}
+            </div>
+
+            <div className="card table-scroll" style={{ marginBottom: 24 }}>
+              <table className="tbl">
+                <thead><tr>
+                  <th>Creator</th><th>Videos</th><th>Days</th><th>Verified views</th><th>View reward</th><th>Posting bonus</th><th>Logo pfp</th><th>Total</th><th>Cash App</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {weekRows.map(({ c, w, logo, total, paid }) => (
+                    <tr key={c.id}>
+                      <td style={{ fontWeight: 600 }}>{c.name}{w.pending > 0 && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{w.pending} pending</div>}</td>
+                      <td>{w.videos}</td>
+                      <td>{w.days}</td>
+                      <td>{num(w.views)}</td>
+                      <td>{w.viewTier ? w.viewTier.label : <span className="muted">—</span>}</td>
+                      <td>{w.bonus ? w.bonus.label : <span className="muted">—</span>}</td>
+                      <td>
+                        {paid
+                          ? (paid.details?.logo_pfp ? '✓' : <span className="muted">—</span>)
+                          : <input type="checkbox" className="chk" checked={logo} onChange={(e) => setPfp((p) => ({ ...p, [c.id + payWeek]: e.target.checked }))} title={`+${money(LOGO_PFP_BONUS)} if their profile pic is the Mad Labs logo`} />}
+                      </td>
+                      <td style={{ fontWeight: 700 }}>{money(paid ? Number(paid.amount) : total)}</td>
+                      <td>{c.cashapp || <span className="muted">—</span>}</td>
+                      <td>
+                        {paid ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span className="pill paid">paid {fmtDate(paid.paid_at)}</span>
+                            <button className="btn btn-ghost sm" onClick={() => unmarkPaid(paid.id)}>Undo</button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn btn-primary sm"
+                            disabled={w.pending > 0 || paying === c.id + 'week'}
+                            title={w.pending > 0 ? 'Review the pending videos first' : ''}
+                            onClick={() => {
+                              if (!confirm(`Mark ${c.name} paid ${money(total)} for ${weekLabel(payWeek)}?`)) return
+                              markPaid({
+                                creator_id: c.id, period: 'week', period_start: payWeek, amount: total,
+                                label: [w.viewTier?.label, w.bonus?.label, logo && `logo +${money(LOGO_PFP_BONUS)}`].filter(Boolean).join(' + ') || '$0',
+                                details: { views: w.views, videos: w.videos, days: w.days, view_reward: w.viewTier?.amount || 0, bonus: w.bonus?.amount || 0, logo_pfp: logo },
+                              })
+                            }}
+                          >Mark paid</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {weekRows.length === 0 && <tr><td className="empty" colSpan={10}>No videos posted this week.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card pad" style={{ marginBottom: 16 }}>
+              <div className="row-between">
+                <div>
+                  <div className="card-h">Monthly prizes · {monthLabel(payMonth)}</div>
+                  <div className="muted" style={{ marginTop: 4 }}>{MONTHLY_PRIZES.map((p) => `${num(p.views)} views → ${p.label}`).join(' · ')}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-ghost sm" onClick={() => setPayMonth(monthStart(addDays(payMonth, -1)))}>← Prev</button>
+                  <button className="btn btn-ghost sm" onClick={() => setPayMonth(monthStart(addDays(payMonth, 32)))}>Next →</button>
+                </div>
+              </div>
+            </div>
+            <div className="card table-scroll">
+              <table className="tbl">
+                <thead><tr><th>Creator</th><th>Verified views</th><th>Prize</th><th>Next prize</th><th></th></tr></thead>
+                <tbody>
+                  {monthRows.map(({ c, m, paid }) => (
+                    <tr key={c.id}>
+                      <td style={{ fontWeight: 600 }}>{c.name}</td>
+                      <td>{num(m.views)}</td>
+                      <td>{m.prize ? <b>{m.prize.label}</b> : <span className="muted">—</span>}</td>
+                      <td className="muted">{m.next ? `${num(m.next.views - m.views)} views to ${m.next.label}` : 'Top prize'}</td>
+                      <td>
+                        {paid ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span className="pill paid">given {fmtDate(paid.paid_at)}</span>
+                            <button className="btn btn-ghost sm" onClick={() => unmarkPaid(paid.id)}>Undo</button>
+                          </div>
+                        ) : m.prize ? (
+                          <button className="btn btn-primary sm" disabled={paying === c.id + 'month'}
+                            onClick={() => { if (confirm(`Mark "${m.prize!.label}" as given to ${c.name}?`)) markPaid({ creator_id: c.id, period: 'month', period_start: payMonth, amount: 0, label: m.prize!.label, details: { views: m.views } }) }}
+                          >Mark given</button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                  {monthRows.length === 0 && <tr><td className="empty" colSpan={5}>No verified views this month yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* ===== CREATORS ===== */}
@@ -492,6 +603,13 @@ export default function AdminPage() {
         {/* ===== SUBMISSIONS (grouped by creator) ===== */}
         {tab === 'submissions' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="card pad row-between">
+              <div className="muted">Type the real views from the video, then set it to Approved (or Rejected if it's down / off-brand).</div>
+              <select value={subWeek} onChange={(e) => setSubWeek(e.target.value)} className="input">
+                <option value="all">All weeks</option>
+                {weekOptions.map((w) => <option key={w} value={w}>Week of {weekLabel(w)}</option>)}
+              </select>
+            </div>
             {subGroups.map((g) => {
               const open = !!openSubs[g.cid]
               return (
@@ -519,7 +637,7 @@ export default function AdminPage() {
                     <div className="table-scroll" style={{ borderTop: '1px solid var(--line)' }}>
                       <table className="tbl">
                         <thead><tr>
-                          <th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th><th>Reward</th><th>Paid</th>
+                          <th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th>
                         </tr></thead>
                         <tbody>
                           {g.entries.map((s) => (
@@ -531,19 +649,14 @@ export default function AdminPage() {
                               <td className="muted">{s.posted_at ? fmtDate(s.posted_at) : '—'}</td>
                               <td className="muted">{fmtDate(s.created_at)}</td>
                               <td className="muted">{num(s.claimed_views || 0)}</td>
-                              <td><input type="text" inputMode="decimal" defaultValue={s.views ? String(s.views) : ''} placeholder="e.g. 1.2m" className="input sm" onBlur={(e) => { const v = parseV(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
+                              <td><input type="text" inputMode="decimal" defaultValue={s.views ? String(s.views) : ''} placeholder="e.g. 1.2m" disabled={s.status === 'paid'} className="input sm" onBlur={(e) => { const v = parseV(e.target.value); if (v !== s.views) update(s.id, { views: v }) }} /></td>
                               <td>
-                                <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
-                                  {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
-                                </select>
+                                {s.status === 'paid'
+                                  ? <span className="pill paid">paid</span>
+                                  : <select value={s.status} onChange={(e) => update(s.id, { status: e.target.value })} className={`input statussel ${s.status}`} style={{ textTransform: 'capitalize' }}>
+                                      {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
+                                    </select>}
                               </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <span className="muted">$</span>
-                                  <input type="number" defaultValue={s.reward_amount} className="input sm" onBlur={(e) => { const v = Number(e.target.value); if (v !== s.reward_amount) update(s.id, { reward_amount: v }) }} />
-                                </div>
-                              </td>
-                              <td><input type="checkbox" checked={s.paid} onChange={(e) => update(s.id, { paid: e.target.checked })} className="chk" /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -553,7 +666,7 @@ export default function AdminPage() {
                 </div>
               )
             })}
-            {subGroups.length === 0 && <div className="card"><div className="empty">No submissions yet.</div></div>}
+            {subGroups.length === 0 && <div className="card"><div className="empty">No submissions {subWeek === 'all' ? 'yet' : 'this week'}.</div></div>}
           </div>
         )}
 
@@ -637,6 +750,9 @@ export default function AdminPage() {
 }
 
 const CSS = `
+.rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-top:18px}
+.rule-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.rule-row span{color:var(--dim)}
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
 .madx *{box-sizing:border-box}
 .madx{min-height:100vh;display:flex;background:var(--bg);color:var(--text);

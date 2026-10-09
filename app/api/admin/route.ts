@@ -29,14 +29,15 @@ export async function POST(req: Request) {
 
   // ---- list everything ----
   if (body.action === 'list') {
-    const [creators, submissions, campaigns, invites, requests] = await Promise.all([
+    const [creators, submissions, campaigns, invites, requests, payouts] = await Promise.all([
       admin.from('creators').select('*').order('created_at', { ascending: false }),
       admin.from('video_submissions').select('*').order('created_at', { ascending: false }),
       admin.from('campaigns').select('*').order('created_at', { ascending: false }),
       admin.from('invite_codes').select('*').order('created_at', { ascending: false }),
       admin.from('signup_requests').select('*').order('created_at', { ascending: false }),
+      admin.from('payouts').select('*').order('paid_at', { ascending: false }),
     ])
-    const err = creators.error || submissions.error || campaigns.error || invites.error || requests.error
+    const err = creators.error || submissions.error || campaigns.error || invites.error || requests.error || payouts.error
     if (err) return NextResponse.json({ error: err.message }, { status: 500 })
     return NextResponse.json({
       creators: creators.data,
@@ -44,15 +45,16 @@ export async function POST(req: Request) {
       campaigns: campaigns.data,
       invites: invites.data,
       requests: requests.data,
+      payouts: payouts.data,
     })
   }
 
-  // ---- update one submission (views/status/reward/paid) ----
+  // ---- update one submission (verified views / status) ----
   if (body.action === 'update') {
     const { id, patch } = body
     if (!id || !patch) return NextResponse.json({ error: 'Missing id/patch' }, { status: 400 })
     const allowed: Record<string, unknown> = {}
-    for (const k of ['views', 'status', 'reward_amount', 'paid']) {
+    for (const k of ['views', 'status']) {
       if (k in patch) allowed[k] = patch[k]
     }
     const { data, error } = await admin
@@ -63,6 +65,50 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ submission: data })
+  }
+
+  // ---- mark a creator's week (or monthly prize) as paid ----
+  // Records the payout and flips that week's approved videos to "paid".
+  if (body.action === 'mark_paid') {
+    const { creator_id, period, period_start, amount, label, details } = body
+    if (!creator_id || !['week', 'month'].includes(period) || !/^\d{4}-\d{2}-\d{2}$/.test(period_start || '')) {
+      return NextResponse.json({ error: 'Missing creator/period' }, { status: 400 })
+    }
+    const ins = await admin.from('payouts').insert({
+      creator_id, period, period_start,
+      amount: Number(amount) || 0, label: label || null, details: details || null,
+    }).select().maybeSingle()
+    if (ins.error) {
+      const msg = ins.error.code === '23505' ? 'Already marked paid.' : ins.error.message
+      return NextResponse.json({ error: msg }, { status: 400 })
+    }
+    if (period === 'week') {
+      const end = new Date(Date.parse(period_start + 'T00:00:00Z') + 6 * 86400000).toISOString().slice(0, 10)
+      const upd = await admin.from('video_submissions')
+        .update({ status: 'paid', paid: true })
+        .eq('creator_id', creator_id).eq('status', 'approved')
+        .gte('posted_at', period_start).lte('posted_at', end + 'T23:59:59')
+      if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 })
+    }
+    return NextResponse.json({ payout: ins.data })
+  }
+
+  // ---- undo a payout (mistakes happen) ----
+  if (body.action === 'unmark_paid') {
+    if (!body.id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const row = await admin.from('payouts').select('*').eq('id', body.id).maybeSingle()
+    if (row.error || !row.data) return NextResponse.json({ error: 'Payout not found' }, { status: 404 })
+    const p = row.data
+    if (p.period === 'week') {
+      const end = new Date(Date.parse(p.period_start + 'T00:00:00Z') + 6 * 86400000).toISOString().slice(0, 10)
+      await admin.from('video_submissions')
+        .update({ status: 'approved', paid: false })
+        .eq('creator_id', p.creator_id).eq('status', 'paid')
+        .gte('posted_at', p.period_start).lte('posted_at', end + 'T23:59:59')
+    }
+    const { error } = await admin.from('payouts').delete().eq('id', p.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
   }
 
   // ---- create / update a campaign ----

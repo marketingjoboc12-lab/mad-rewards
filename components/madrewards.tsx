@@ -12,6 +12,11 @@ import {
   Link as LinkIcon, FileText, Tag, Ticket, Gift, Package
 } from 'lucide-react';
 import { supabase, SUPABASE_URL_IN_USE } from '@/lib/supabase';
+import {
+  VIEW_TIERS, POSTING_BONUSES, MONTHLY_PRIZES, LOGO_PFP_BONUS,
+  computeWeek, computeMonth, todayLocal, weekStart, monthStart, addDays,
+  weekLabel, monthLabel, earliestSubmittableDate, normalizeVideoUrl,
+} from '@/lib/rewards';
 
 // Turn opaque network failures into something a human can act on.
 const friendlyError = (e) => {
@@ -28,7 +33,7 @@ const friendlyError = (e) => {
 // =============================================================================
 //  MAD REWARDS — Influencer rewards portal
 //  Wired to Supabase: signup -> creators, video submit -> video_submissions,
-//  Recent submissions loaded live. Campaigns remain local (no campaigns table).
+//  Creators only load their own videos + payouts. Reward rules: lib/rewards.ts.
 // =============================================================================
 
 // Map a video_submissions row (snake_case) onto the camelCase shape the
@@ -42,6 +47,7 @@ const mapSubmissionRow = (r) => ({
   status: r.status,
   submittedAt: r.created_at,
   postedAt: r.posted_at || null,
+  posted: (r.posted_at || r.created_at || '').slice(0, 10),
   claimedViews: r.claimed_views ?? 0,
   payout: Number(r.reward_amount) || 0,
   views: r.views ?? 0,
@@ -58,84 +64,19 @@ const mapCreatorRow = (r) => ({
   instagram: r.instagram_handle,
   status: r.status,
   joined: r.created_at,
+  rulesAccepted: !!r.rules_accepted_at,
 });
 
-// ────────────────────────── MOCK DATA ──────────────────────────
-const initialCampaigns = [
-  {
-    id: 'cmp_01',
-    title: 'Launch Week Sprint',
-    reward: 250,
-    bonus: 500,
-    description: 'Post a TikTok or Reel featuring the drop during launch week. Highest engagement bags the bonus.',
-    requirements: [
-      'Post 1 TikTok or Reel',
-      'Tag @madintel in caption',
-      'Use hashtag #MADdrop',
-      'Hit 5,000+ views in 72 hours',
-    ],
-    startDate: '2026-05-19',
-    endDate: '2026-06-02',
-    active: true,
-  },
-  {
-    id: 'cmp_02',
-    title: 'Behind The Brand',
-    reward: 150,
-    bonus: 0,
-    description: 'A casual day-in-the-life vibe featuring the product. Authentic > polished.',
-    requirements: [
-      '30s+ TikTok or Reel',
-      'Tag @madintel',
-      'Show product in first 3 seconds',
-      'Hit 2,000+ views',
-    ],
-    startDate: '2026-05-26',
-    endDate: '2026-06-09',
-    active: true,
-  },
-  {
-    id: 'cmp_03',
-    title: 'Carousel Week',
-    reward: 100,
-    bonus: 0,
-    description: 'Instagram carousel only. Tell a story across 5+ slides.',
-    requirements: [
-      '5+ slide carousel',
-      'Tag @madintel',
-      'Hit 1,500+ saves or 3,000+ likes',
-    ],
-    startDate: '2026-05-12',
-    endDate: '2026-05-26',
-    active: false,
-  },
-];
+// Shape the reward math in lib/rewards.ts expects.
+const toSubLike = (s) => ({ posted: s.posted, status: s.status, views: s.views, claimedViews: s.claimedViews });
 
-const initialCreators = [
-  { id: 'usr_01', name: 'Maya Okafor',     email: 'maya@example.com',     phone: '+1 415 555 0142', tiktok: '@mayaokafor',  instagram: '@maya.ok',     joined: '2026-04-12', password: 'demo' },
-  { id: 'usr_02', name: 'Diego Salinas',   email: 'diego@example.com',    phone: '+1 213 555 0188', tiktok: '@diegosalinas', instagram: '@diego.s',   joined: '2026-04-18', password: 'demo' },
-  { id: 'usr_03', name: 'Priya Raman',     email: 'priya@example.com',    phone: '+1 646 555 0119', tiktok: '@priyaraman',   instagram: '@priya.r',   joined: '2026-04-21', password: 'demo' },
-  { id: 'usr_04', name: 'Sam Whitlock',    email: 'sam@example.com',      phone: '+44 20 7946 0918', tiktok: '@samwhitlock', instagram: '@sam.w',    joined: '2026-05-02', password: 'demo' },
-  { id: 'usr_05', name: 'Noor Hassan',     email: 'noor@example.com',     phone: '+1 305 555 0177', tiktok: '@noorhassan',   instagram: '@noor.h',   joined: '2026-05-09', password: 'demo' },
-  { id: 'usr_06', name: 'Tomás Ferreira',  email: 'tomas@example.com',    phone: '+55 11 9876 4321', tiktok: '@tomasferreira', instagram: '@tomas.f', joined: '2026-05-14', password: 'demo' },
-];
-
-const initialSubmissions = [
-  { id: 'sub_01', creatorId: 'usr_01', campaignId: 'cmp_01', url: 'https://www.tiktok.com/@mayaokafor/video/7430000000000000001', platform: 'tiktok',    submittedAt: '2026-05-20', status: 'approved', notes: 'Hit 12k views in 48h.', payout: 250 },
-  { id: 'sub_02', creatorId: 'usr_01', campaignId: 'cmp_02', url: 'https://www.instagram.com/reel/AbcDef123/', platform: 'instagram',                     submittedAt: '2026-05-23', status: 'pending',  notes: '', payout: 150 },
-  { id: 'sub_03', creatorId: 'usr_02', campaignId: 'cmp_01', url: 'https://www.tiktok.com/@diegosalinas/video/7430000000000000002', platform: 'tiktok',  submittedAt: '2026-05-21', status: 'paid',     notes: 'Top performer — bonus paid.', payout: 750 },
-  { id: 'sub_04', creatorId: 'usr_03', campaignId: 'cmp_01', url: 'https://www.tiktok.com/@priyaraman/video/7430000000000000003', platform: 'tiktok',    submittedAt: '2026-05-22', status: 'approved', notes: '', payout: 250 },
-  { id: 'sub_05', creatorId: 'usr_04', campaignId: 'cmp_03', url: 'https://www.instagram.com/p/CarouselXYZ/', platform: 'instagram',                     submittedAt: '2026-05-18', status: 'rejected', notes: 'Did not tag brand.', payout: 0 },
-  { id: 'sub_06', creatorId: 'usr_05', campaignId: 'cmp_02', url: 'https://www.tiktok.com/@noorhassan/video/7430000000000000004', platform: 'tiktok',    submittedAt: '2026-05-24', status: 'pending',  notes: '', payout: 150 },
-  { id: 'sub_07', creatorId: 'usr_06', campaignId: 'cmp_01', url: 'https://www.instagram.com/reel/Tomas01/', platform: 'instagram',                      submittedAt: '2026-05-23', status: 'approved', notes: '', payout: 250 },
-  { id: 'sub_08', creatorId: 'usr_02', campaignId: 'cmp_02', url: 'https://www.tiktok.com/@diegosalinas/video/7430000000000000005', platform: 'tiktok',  submittedAt: '2026-05-25', status: 'pending',  notes: '', payout: 150 },
-];
-
-const ADMIN_CREDS = { email: 'admin@madintel.com', password: 'admin' };
-
-// ────────────────────────── HELPERS ──────────────────────────
 const fmtMoney = (n) => `$${Number(n).toLocaleString('en-US')}`;
 const fmtDate = (s) => new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// 'YYYY-MM-DD' -> 'Oct 5' without timezone shifting the day.
+const fmtDay = (d) => (d ? `${MONTHS_SHORT[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}` : '—');
+const fmtViews = (n) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}K` : String(n));
+const toUrl = (u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
 const fmtDateFull = (s) => new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 const detectPlatform = (url) => {
@@ -395,6 +336,11 @@ const ThemeStyles = () => (
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { scrollbar-width: none; }
 
+    /* swipe-to-agree arrow nudge */
+    @keyframes slideHint { 0%,100% { transform: translateX(0); opacity: .5 } 50% { transform: translateX(6px); opacity: 1 } }
+    .slide-hint { display: inline-block; animation: slideHint 1.4s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .slide-hint { animation: none; } }
+
     /* Infinite horizontal marquee for video carousel */
     @keyframes marquee {
       0%   { transform: translateX(0); }
@@ -585,14 +531,14 @@ const Reveal = ({
 // ============================================================================
 const REWARD_TEASERS = {
   week: [
-    { tag: 'Re-up', label: 'Free product restock', sub: 'Stay active, keep posting' },
-    { tag: '$100', label: 'Cash reward', sub: 'Hit the weekly view goal' },
-    { tag: '$200', label: 'Cash reward', sub: 'Push past the next tier' },
+    { tag: '$25–$600', label: 'Cash for your views', sub: 'Every single week' },
+    { tag: '+$50', label: 'Posting bonus', sub: 'Show up every day' },
+    { tag: '+$10', label: 'Rep the logo', sub: 'Easy money' },
   ],
   month: [
-    { tag: '$300', label: 'Cash reward', sub: 'Monthly reach milestone' },
-    { tag: '$350 + bag', label: 'Cash + MAD duffle bag', sub: 'Top creators only' },
-    { tag: '$350 + device', label: 'Cash + Mega device', sub: 'Hit the big numbers' },
+    { tag: 'iPhone', label: 'Brand new iPhone', sub: 'Monthly reach goal' },
+    { tag: 'Trip for 2', label: 'All on us', sub: 'For the crazy ones' },
+    { tag: '???', label: 'More drops soon', sub: 'Stay tuned' },
   ],
 };
 
@@ -860,60 +806,6 @@ const RequestPage = ({ go, onSubmit }) => {
   );
 };
 
-const AdminLoginPage = ({ go, onAdminLogin }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const submit = (e) => {
-    e.preventDefault();
-    if (email.toLowerCase() === ADMIN_CREDS.email && password === ADMIN_CREDS.password) {
-      onAdminLogin();
-    } else {
-      setError('Invalid admin credentials. Try admin@madintel.com / admin');
-    }
-  };
-
-  return (
-    <div className="relative z-10 min-h-screen flex flex-col">
-      <nav className="px-5 md:px-10 py-6 flex items-center justify-between max-w-7xl mx-auto w-full">
-        <button onClick={() => go('landing')} className="flex items-center gap-1.5 text-[var(--text-dim)] hover:text-[var(--text)] -ml-1 h-9 px-3 rounded-full hover:bg-[var(--elev1)]">
-          <ChevronLeft size={16} />
-          <span className="text-sm font-semibold">Back</span>
-        </button>
-        <Logo small />
-      </nav>
-
-      <div className="flex-1 flex items-center justify-center px-5 py-10">
-        <div className="w-full max-w-md anim-fade-up">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] mb-6">
-              <Shield size={22} className="text-[var(--accent)]" />
-            </div>
-            <h1 className="font-display font-extrabold text-3xl md:text-4xl tracking-tight">Admin sign-in</h1>
-            <p className="mt-3 text-sm text-[var(--text-dim)]">Restricted access. Audited.</p>
-          </div>
-          <form onSubmit={submit} className="space-y-4">
-            <Field label="Email" icon={Mail} type="email" placeholder="admin@madintel.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Field label="Password" icon={Lock} type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-            {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
-            <div className="pt-2">
-              <Btn type="submit" size="lg" className="w-full" iconRight={ArrowRight}>Enter admin</Btn>
-            </div>
-          </form>
-          <div className="mt-6 p-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-xs text-[var(--text-dim)]">
-            <div className="font-semibold text-[var(--text)] mb-1">Demo admin</div>
-            <span className="font-mono text-[var(--accent)]">admin@madintel.com</span> / <span className="font-mono">admin</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-//  CREATOR APP
-// ============================================================================
 const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const tabs = [
@@ -987,28 +879,151 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
   );
 };
 
-const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
-  const mine = submissions.filter((s) => s.creatorId === user.id);
-  const pending = mine.filter((s) => s.status === 'pending').length;
-  const earned = mine.filter((s) => s.status === 'paid').reduce((sum, s) => sum + (s.payout || 0), 0);
-  const pendingPayout = mine.filter((s) => s.status === 'approved').reduce((sum, s) => sum + (s.payout || 0), 0);
+// ────────────────────────── RULES (shown in the swipe-to-agree popup + Rewards tab) ──────────────────────────
+const VIDEO_STYLES = [
+  { e: '😮', t: 'Reaction', d: 'React to the hit, the flavor, the vibe' },
+  { e: '🗣️', t: 'Review / talking', d: 'Talk to the camera, keep it real' },
+  { e: '🎙️', t: 'Voice-over', d: 'Narrate over clips of the device' },
+  { e: '🎵', t: 'Music / trend', d: 'Hop on a sound or trend' },
+  { e: '📸', t: 'Clean device shot', d: 'A clear, good-looking video of the device' },
+  { e: '💨', t: 'Blinker', d: 'You taking a blinker — on camera' },
+];
 
-  // ── Rewards calculator (driven by the active campaign) ──
-  const tiers = deal?.tiers || [];
-  const periodStart = deal?.starts_at ? new Date(deal.starts_at) : null;
-  const minePeriod = periodStart ? mine.filter((s) => new Date(s.postedAt || s.submittedAt) >= periodStart) : mine;
-  const videoCount = minePeriod.length;
-  const totalViews = minePeriod.reduce((sum, s) => sum + (s.views || 0), 0);
-  const qualifies = (t) => (t.videos != null && videoCount >= t.videos) || (totalViews >= t.views);
-  let currentIdx = -1;
-  tiers.forEach((t, i) => { if (qualifies(t)) currentIdx = Math.max(currentIdx, i); });
-  const current = currentIdx >= 0 ? tiers[currentIdx] : null;
-  const next = tiers[currentIdx + 1] || null;
-  const viewsToNext = next ? Math.max(0, next.views - totalViews) : 0;
-  const videosToNext = next && next.videos != null ? Math.max(0, next.videos - videoCount) : null;
-  const nf = (n) => Number(n || 0).toLocaleString();
-  const progress = next ? Math.min(100, Math.round((totalViews / next.views) * 100)) : 100;
+const RulesContent = () => (
+  <div className="space-y-7 text-sm leading-relaxed">
+    <div>
+      <h3 className="font-display font-bold text-lg mb-3">🎬 Pick your style</h3>
+      <div className="grid grid-cols-2 gap-2">
+        {VIDEO_STYLES.map((s) => (
+          <div key={s.t} className="p-3 rounded-2xl bg-[var(--elev2)] border border-[var(--border)]">
+            <div className="font-semibold">{s.e} {s.t}</div>
+            <div className="text-xs text-[var(--text-dim)] mt-0.5">{s.d}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div className="p-4 rounded-2xl border-2 border-[var(--accent)] bg-[var(--accent-soft)]">
+      <div className="font-display font-bold text-base">🏷️ The #1 rule</div>
+      <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. Simple as that. 🤝</p>
+    </div>
+
+    <div>
+      <h3 className="font-display font-bold text-lg mb-2">📅 How the week works</h3>
+      <ol className="space-y-1.5">
+        <li>1️⃣ Post your videos <b>Sunday → Saturday</b></li>
+        <li>2️⃣ Drop every link + its views here by <b>Saturday 11:59pm</b></li>
+        <li>3️⃣ Forgot? We'll email you Sunday — that's your <b>last call</b> ⏰</li>
+        <li>4️⃣ <b>Monday</b> we check every video by hand 👀</li>
+        <li>5️⃣ You get paid 💸</li>
+      </ol>
+    </div>
+
+    <div>
+      <h3 className="font-display font-bold text-lg mb-2">🚨 Don't fumble the bag</h3>
+      <ul className="space-y-1.5">
+        <li>🚫 <b>Video must still be up when we check Monday.</b> TikTok & IG take down cannabis stuff a lot — if it's gone, it doesn't count.</li>
+        <li>🧢 <b>No cap on views.</b> We verify every number. Fake numbers = you're out, no second chances.</li>
+        <li>🔁 <b>One link, one submission.</b> No double dipping.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3 className="font-display font-bold text-lg mb-2">💰 What you can earn</h3>
+      <div className="space-y-1">
+        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)]">Weekly views (you get your highest tier)</div>
+        {VIEW_TIERS.map((t) => (
+          <div key={t.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{fmtViews(t.views)} views</span><b className="text-[var(--accent)]">{t.label}</b></div>
+        ))}
+        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] pt-3">Weekly posting bonus (on top 🔥)</div>
+        {POSTING_BONUSES.map((b) => (
+          <div key={b.videos} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{b.videos}+ videos on {b.days === 7 ? 'all 7' : `${b.days}+ different`} days</span><b className="text-[var(--accent)]">{b.label}</b></div>
+        ))}
+        <div className="flex justify-between border-b border-[var(--border)] py-1.5"><span>Mad Labs logo as your pfp 😎</span><b className="text-[var(--accent)]">+{fmtMoney(LOGO_PFP_BONUS)}/week</b></div>
+        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] pt-3">Monthly big prizes 🏆</div>
+        {MONTHLY_PRIZES.map((p) => (
+          <div key={p.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{fmtViews(p.views)} views in a month</span><b className="text-[var(--accent)]">{p.label}</b></div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Drag the knob all the way right to agree. Keyboard: focus the knob, press → or Enter.
+const SlideToAgree = ({ onDone, label = 'Slide to agree' }) => {
+  const track = useRef(null);
+  const startX = useRef(0);
+  const [x, setX] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const [done, setDone] = useState(false);
+  const KNOB = 56;
+  const max = () => (track.current?.offsetWidth || 320) - KNOB - 8;
+  const finish = () => { setX(max()); setDone(true); onDone(); };
+  return (
+    <div ref={track} className="relative h-[72px] rounded-full bg-[var(--elev2)] border border-[var(--border)] overflow-hidden select-none touch-none">
+      <div className="absolute inset-y-0 left-0 bg-[var(--accent-soft)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
+      <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
+        {done ? "You're in 🤝" : <>{label} <span className="ml-2 slide-hint">→→</span></>}
+      </div>
+      <button
+        type="button"
+        aria-label={label}
+        className="absolute top-[7px] left-[4px] w-14 h-14 rounded-full bg-[var(--accent)] text-black flex items-center justify-center shadow-[0_4px_16px_-4px_var(--accent)] cursor-grab active:cursor-grabbing"
+        style={{ transform: `translateX(${x}px)`, transition: drag ? 'none' : 'transform .3s' }}
+        onPointerDown={(e) => { if (done) return; setDrag(true); startX.current = e.clientX - x; e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerMove={(e) => { if (drag) setX(Math.max(0, Math.min(max(), e.clientX - startX.current))); }}
+        onPointerUp={() => { if (!drag) return; setDrag(false); if (x >= max() * 0.88) finish(); else setX(0); }}
+        onKeyDown={(e) => { if (!done && (e.key === 'ArrowRight' || e.key === 'Enter')) { e.preventDefault(); finish(); } }}
+      >
+        {done ? <Check size={22} strokeWidth={3} /> : <ArrowRight size={22} strokeWidth={3} />}
+      </button>
+    </div>
+  );
+};
+
+const RulesGate = ({ user, onAccept }) => {
+  const [error, setError] = useState('');
+  const accept = async () => {
+    setError('');
+    try { await onAccept(); } catch (e) { setError(friendlyError(e)); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6">
+      <div className="w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[var(--bg)] border border-[var(--border)] anim-fade-up">
+        <div className="px-6 pt-6 pb-3">
+          <div className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">Before you start</div>
+          <h2 className="font-display font-extrabold text-3xl tracking-tight mt-1">The rules, {(user.name || '').split(' ')[0] || 'fam'} 📜</h2>
+          <p className="text-sm text-[var(--text-dim)] mt-1">Quick read. Promise it's worth it. 💸</p>
+        </div>
+        <div className="px-6 overflow-y-auto flex-1">
+          <RulesContent />
+        </div>
+        <div className="p-6 pt-4 border-t border-[var(--border)]">
+          <p className="text-xs text-[var(--text-dim)] mb-3 text-center">By sliding, you agree to all the rules above. ✅</p>
+          <SlideToAgree onDone={accept} label="Slide to agree" />
+          {error && <p className="text-xs text-[var(--danger)] mt-3 text-center font-semibold">{error}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ────────────────────────── CREATOR DASHBOARD ──────────────────────────
+const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView }) => {
+  const mine = submissions;
+  const subs = mine.map(toSubLike);
+  const today = todayLocal();
+  const thisWeek = weekStart(today);
+  const lastCall = today === thisWeek; // Sunday: last week's videos can still go in
+  const w = computeWeek(subs, thisWeek, true);
+  const m = computeMonth(subs, monthStart(today), true);
+  const earned = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const pending = mine.filter((s) => s.status === 'pending').length;
+  const nextTier = VIEW_TIERS.find((t) => t.views > w.views) || null;
+  const progress = nextTier ? Math.min(100, Math.round((w.views / nextTier.views) * 100)) : 100;
+  const monthProgress = m.next ? Math.min(100, Math.round((m.views / m.next.views) * 100)) : 100;
   const examples = deal?.examples || [];
+  const nf = (n) => Number(n || 0).toLocaleString();
 
   return (
     <div className="space-y-10 md:space-y-12">
@@ -1017,28 +1032,32 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
         <Trophy className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.07] pointer-events-none hidden sm:block" size={150} />
         <div className="relative">
-          <span className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">{fmtDateFull(new Date().toISOString())}</span>
+          <span className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">Week of {weekLabel(thisWeek)}</span>
           <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">
             Welcome back, {user.name.split(' ')[0]}.
           </h1>
           <p className="mt-3 text-[var(--text-dim)] max-w-lg leading-relaxed">
-            {deal
-              ? (current
-                  ? <>You've unlocked <span className="text-[var(--text)] font-semibold">{current.reward_label}</span> so far this {deal.cadence === 'monthly' ? 'month' : 'week'}.</>
-                  : <>No reward unlocked yet — keep posting to hit your first tier.</>)
-              : <>No active campaign right now. Check back soon.</>}
+            {w.total > 0
+              ? <>You're on track for <span className="text-[var(--text)] font-semibold">{fmtMoney(w.total)}</span> this week. Submit every video by <b className="text-[var(--text)]">Saturday 11:59pm</b>.</>
+              : <>Post, then drop your links + views here by <b className="text-[var(--text)]">Saturday 11:59pm</b>. 🎬</>}
           </p>
         </div>
       </div>
 
+      {lastCall && (
+        <div className="p-4 md:p-5 rounded-2xl border-2 border-amber-400/60 bg-amber-400/10 text-sm anim-fade-up">
+          ⏰ <b>Last call:</b> today's the last day to submit videos from last week ({weekLabel(addDays(thisWeek, -7))}). Closes tonight 11:59pm.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 anim-fade-up anim-d-100">
         <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
           <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a3e635,#4d7c0f)' }}><Wallet size={18} /></span>
-          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(earned)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Earned</div></div>
+          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(earned)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Paid to you</div></div>
         </div>
         <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
           <span className="w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a78bfa,#6d28d9)' }}><Clock size={18} /></span>
-          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(pendingPayout)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Pending</div></div>
+          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(w.total)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">This week (estimate)</div></div>
         </div>
         <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
           <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#fcd34d,#d97706)' }}><Inbox size={18} /></span>
@@ -1046,94 +1065,113 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
         </div>
       </div>
 
-      {/* ── REWARDS ── */}
-      {deal ? (
-        <div className="anim-fade-up anim-d-200">
-          {/* progress header */}
-          <Card className="relative overflow-hidden p-7 md:p-10">
-            <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
-            <div className="relative">
-              <Badge status="active">{deal.cadence === 'monthly' ? 'This month' : 'This week'}</Badge>
-              <h2 className="font-display font-extrabold text-3xl md:text-5xl mt-5 tracking-tight">{deal.title}</h2>
-
-              <div className="mt-7 grid grid-cols-2 gap-4 max-w-md">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your views</div>
-                  <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(totalViews)}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Your videos</div>
-                  <div className="font-display font-bold text-3xl md:text-4xl">{videoCount}</div>
-                </div>
+      {/* ── THIS WEEK ── */}
+      <div className="anim-fade-up anim-d-200">
+        <Card className="relative overflow-hidden p-7 md:p-10">
+          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
+          <div className="relative">
+            <Badge status="active">This week</Badge>
+            <div className="mt-6 grid grid-cols-3 gap-4 max-w-lg">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Views</div>
+                <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(w.views)}</div>
               </div>
-
-              {/* the one clear sentence */}
-              <div className="mt-7">
-                {current && (
-                  <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--accent)] text-black font-bold text-sm mb-4">
-                    <Check size={15} strokeWidth={3} /> You've earned {current.reward_label}
-                  </div>
-                )}
-                {next ? (
-                  <>
-                    <div className="text-lg md:text-xl font-semibold">
-                      {nf(viewsToNext)} more views{videosToNext != null && <> (or {videosToNext} more videos)</>} to unlock <span className="text-[var(--accent)]">{next.reward_label}</span>
-                    </div>
-                    <div className="mt-4 h-3 rounded-full bg-[var(--elev2)] overflow-hidden">
-                      <div className="h-full bg-[var(--accent)] rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-lg md:text-xl font-bold text-[var(--accent)]">🎉 You've reached the top reward. Incredible.</div>
-                )}
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Videos</div>
+                <div className="font-display font-bold text-3xl md:text-4xl">{w.videos}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Days posted</div>
+                <div className="font-display font-bold text-3xl md:text-4xl">{w.days}</div>
               </div>
             </div>
-          </Card>
 
-          {/* reward ladder */}
-          <div className="mt-6 space-y-3">
-            {tiers.map((t, i) => {
-              const hit = qualifies(t);
-              const isNext = i === currentIdx + 1;
-              const Ico = tierIcon(t.reward_label);
-              return (
-                <div
-                  key={i}
-                  className={`reward-step group flex items-center gap-4 p-4 md:p-5 rounded-2xl border transition-all duration-300
-                    ${hit
-                      ? 'border-[var(--accent)] shadow-[0_8px_30px_-12px_var(--accent)]'
-                      : isNext
-                        ? 'border-[var(--accent)]/40 bg-[var(--elev1)]'
-                        : 'border-[var(--border)] bg-[var(--elev1)] opacity-60'}`}
-                  style={hit ? { background: 'linear-gradient(135deg, var(--accent-soft), transparent)' } : undefined}
-                >
-                  <span
-                    className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all
-                      ${hit ? 'bg-[var(--accent)] text-black scale-100' : isNext ? 'bg-[var(--elev2)] text-[var(--accent)] pulse-soft' : 'bg-[var(--elev2)] text-[var(--text-faint)]'}`}
-                  >
-                    {hit ? <Check size={22} strokeWidth={3} /> : <Ico size={20} />}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display font-bold text-lg md:text-xl">{t.reward_label}</span>
-                      {hit && <span className="text-[10px] uppercase tracking-wide font-bold text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 rounded-full">Unlocked</span>}
-                      {isNext && <span className="text-[10px] uppercase tracking-wide font-bold text-[var(--text-dim)] border border-[var(--border)] px-2 py-0.5 rounded-full">Next up</span>}
-                    </div>
-                    <div className="text-sm text-[var(--text-dim)] mt-0.5">
-                      {t.videos != null ? <>{t.videos} videos or {nf(t.views)} views</> : <>{nf(t.views)} views</>}
-                    </div>
+            <div className="mt-7">
+              {w.viewTier && (
+                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--accent)] text-black font-bold text-sm mb-4">
+                  <Check size={15} strokeWidth={3} /> {w.viewTier.label} unlocked
+                </div>
+              )}
+              {nextTier ? (
+                <>
+                  <div className="text-lg md:text-xl font-semibold">
+                    {nf(nextTier.views - w.views)} more views to unlock <span className="text-[var(--accent)]">{nextTier.label}</span>
                   </div>
-                  {!hit && <Lock size={16} className="text-[var(--text-faint)] flex-shrink-0" />}
+                  <div className="mt-4 h-3 rounded-full bg-[var(--elev2)] overflow-hidden">
+                    <div className="h-full bg-[var(--accent)] rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                  </div>
+                </>
+              ) : (
+                <div className="text-lg md:text-xl font-bold text-[var(--accent)]">🎉 Top view tier this week. Incredible.</div>
+              )}
+              <p className="text-xs text-[var(--text-faint)] mt-3">Estimate based on the views you entered. Final numbers after we verify on Monday.</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* view ladder */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
+          {VIEW_TIERS.map((t) => {
+            const hit = w.views >= t.views;
+            const isNext = nextTier?.views === t.views;
+            return (
+              <div key={t.views}
+                className={`reward-step p-4 md:p-5 rounded-2xl border transition-all duration-300 ${hit ? 'border-[var(--accent)] shadow-[0_8px_30px_-12px_var(--accent)]' : isNext ? 'border-[var(--accent)]/40 bg-[var(--elev1)]' : 'border-[var(--border)] bg-[var(--elev1)] opacity-60'}`}
+                style={hit ? { background: 'linear-gradient(135deg, var(--accent-soft), transparent)' } : undefined}>
+                <div className="flex items-center justify-between">
+                  <span className="font-display font-bold text-xl md:text-2xl">{t.label}</span>
+                  {hit ? <Check size={18} strokeWidth={3} className="text-[var(--accent)]" /> : <Lock size={14} className="text-[var(--text-faint)]" />}
+                </div>
+                <div className="text-sm text-[var(--text-dim)] mt-0.5">{fmtViews(t.views)} views</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── BONUSES ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up anim-d-200">
+        <Card className="p-6 md:p-7">
+          <h3 className="font-display font-bold text-xl tracking-tight">🔥 Posting bonus</h3>
+          <p className="text-xs text-[var(--text-dim)] mt-1">Stacks on top of your view reward. Post on different days.</p>
+          <div className="mt-5 space-y-4">
+            {POSTING_BONUSES.map((b) => {
+              const hit = w.videos >= b.videos && w.days >= b.days;
+              return (
+                <div key={b.videos}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">{b.videos}+ videos · {b.days === 7 ? 'all 7' : `${b.days}+`} days</span>
+                    <span className={hit ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-dim)]'}>{hit ? '✓ ' : ''}{b.label}</span>
+                  </div>
+                  <div className="text-xs text-[var(--text-dim)] mt-1">{Math.min(w.videos, b.videos)}/{b.videos} videos · {Math.min(w.days, b.days)}/{b.days} days</div>
+                  <div className="mt-2 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
+                    <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${Math.round(((Math.min(w.videos, b.videos) / b.videos) + (Math.min(w.days, b.days) / b.days)) * 50)}%` }} />
+                  </div>
                 </div>
               );
             })}
+            <div className="pt-3 border-t border-[var(--border)] flex items-center justify-between text-sm">
+              <span>😎 Mad Labs logo as your pfp</span>
+              <span className="font-bold text-[var(--accent)]">+{fmtMoney(LOGO_PFP_BONUS)}/week</span>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Card className="p-8 text-center anim-fade-up anim-d-200">
-          <p className="text-sm text-[var(--text-dim)]">No active campaign right now. Check back soon.</p>
         </Card>
-      )}
+
+        <Card className="p-6 md:p-7">
+          <h3 className="font-display font-bold text-xl tracking-tight">🏆 {monthLabel(monthStart(today))} big prize</h3>
+          <p className="text-xs text-[var(--text-dim)] mt-1">{MONTHLY_PRIZES.map((p) => `${fmtViews(p.views)} → ${p.label}`).join(' · ')}</p>
+          <div className="mt-5 font-display font-bold text-3xl text-[var(--accent)]">{nf(m.views)} <span className="text-base text-[var(--text-dim)] font-semibold">views this month</span></div>
+          {m.prize && <div className="inline-flex mt-3 px-3 py-1.5 rounded-full bg-[var(--accent)] text-black font-bold text-sm">🎉 {m.prize.label} unlocked</div>}
+          {m.next && (
+            <>
+              <div className="mt-3 text-sm font-semibold">{nf(m.next.views - m.views)} more to win <span className="text-[var(--accent)]">{m.next.label}</span></div>
+              <div className="mt-3 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
+                <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${monthProgress}%` }} />
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
 
       <SubmitForm user={user} onSubmit={onSubmit} />
 
@@ -1170,7 +1208,7 @@ const CreatorDashboard = ({ user, deal, submissions, onSubmit, setView }) => {
           </Card>
         ) : (
           <div className="space-y-2.5">
-            {mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} campaign={null} />)}
+            {mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} />)}
           </div>
         )}
       </div>
@@ -1187,7 +1225,9 @@ const SubmitForm = ({ user, onSubmit }) => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const ready = url && postedAt && parseViews(claimedViews) > 0;
+  const today = todayLocal();
+  const minDate = earliestSubmittableDate(today);
+  const ready = url && postedAt && postedAt >= minDate && postedAt <= today && parseViews(claimedViews) > 0;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -1207,8 +1247,6 @@ const SubmitForm = ({ user, onSubmit }) => {
     }
   };
 
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
     <Card className="p-6 md:p-8 anim-fade-up anim-d-300">
       <div className="flex items-center gap-3 mb-6">
@@ -1217,7 +1255,7 @@ const SubmitForm = ({ user, onSubmit }) => {
         </div>
         <div>
           <h3 className="font-display font-bold text-xl tracking-tight">Submit a video</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-0.5">Add your video, where it posted, when, and its views</p>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">One video at a time: link, date posted, and its views right now</p>
         </div>
       </div>
 
@@ -1254,6 +1292,7 @@ const SubmitForm = ({ user, onSubmit }) => {
             <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Date posted</label>
             <input
               type="date"
+              min={minDate}
               max={today}
               value={postedAt}
               onChange={(e) => setPostedAt(e.target.value)}
@@ -1282,6 +1321,10 @@ const SubmitForm = ({ user, onSubmit }) => {
           </div>
         </div>
 
+        <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+          🚫 Your video has to <b className="text-[var(--text)]">still be up when we check on Monday</b> — TikTok & IG take down cannabis content a lot, and removed videos don't count. 🏷️ MAD LABS must be clearly visible.
+        </p>
+
         <div className="flex items-center justify-end gap-3 pt-1">
           {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
           {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted for review</span>}
@@ -1292,98 +1335,50 @@ const SubmitForm = ({ user, onSubmit }) => {
   );
 };
 
-const SubmissionRow = ({ sub, campaign }) => (
-  <Card interactive className="p-4 md:p-5">
-    <div className="flex items-start gap-4">
-      <div className="w-11 h-11 rounded-2xl bg-[var(--elev2)] flex items-center justify-center flex-shrink-0">
-        <PlatformIcon platform={sub.platform} size={16} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <div className="font-semibold text-sm truncate">{campaign?.title || 'Campaign'}</div>
-            <a href={sub.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--text-dim)] hover:text-[var(--accent)] truncate flex items-center gap-1 mt-1 max-w-full">
-              <span className="truncate">{sub.url}</span>
-              <ExternalLink size={11} className="flex-shrink-0" />
-            </a>
-          </div>
-          <Badge status={sub.status} />
-        </div>
-        <div className="flex items-center gap-3 mt-2.5 text-xs text-[var(--text-dim)]">
-          <span>{fmtDate(sub.submittedAt)}</span>
-          {sub.status === 'paid' && <span className="text-[var(--accent)] font-semibold">+{fmtMoney(sub.payout)}</span>}
-          {sub.notes && <span className="truncate">· {sub.notes}</span>}
-        </div>
-      </div>
-    </div>
-  </Card>
-);
-
-const CreatorRewards = ({ campaigns }) => {
-  const [filter, setFilter] = useState('active');
-  const filtered = campaigns.filter((c) => filter === 'all' ? true : filter === 'active' ? c.active : !c.active);
-
+const SubmissionRow = ({ sub }) => {
+  const verified = sub.status === 'approved' || sub.status === 'paid';
   return (
-    <div className="space-y-8 md:space-y-10">
-      <div className="anim-fade-up">
-        <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Active challenges</span>
-        <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Weekly Rewards</h1>
-        <p className="mt-3 text-[var(--text-dim)] max-w-md">Pick a challenge, hit the brief, get paid.</p>
-      </div>
-
-      <div className="flex gap-1 p-1 rounded-full bg-[var(--elev1)] border border-[var(--border)] w-fit anim-fade-up anim-d-100">
-        {[{ k: 'active', l: 'Active' }, { k: 'ended', l: 'Ended' }, { k: 'all', l: 'All' }].map((t) => (
-          <button
-            key={t.k}
-            onClick={() => setFilter(t.k)}
-            className={`h-9 px-5 rounded-full text-sm font-semibold ${filter === t.k ? 'bg-[var(--accent)] text-black shadow-[0_4px_16px_-4px_var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}
-          >
-            {t.l}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((c, i) => (
-          <Card key={c.id} interactive className={`relative overflow-hidden p-7 md:p-8 anim-fade-up anim-d-${Math.min((i + 1) * 100, 500)}`}>
-            <div className="flex items-start justify-between mb-5">
-              <Badge status={c.active ? 'active' : 'ended'} />
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)]">Reward</div>
-                <div className="font-display font-bold text-2xl md:text-3xl text-[var(--accent)] mt-0.5">{fmtMoney(c.reward)}</div>
-              </div>
+    <Card interactive className="p-4 md:p-5">
+      <div className="flex items-start gap-4">
+        <div className="w-11 h-11 rounded-2xl bg-[var(--elev2)] flex items-center justify-center flex-shrink-0">
+          <PlatformIcon platform={sub.platform} size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">Posted {fmtDay(sub.posted)}</div>
+              <a href={sub.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--text-dim)] hover:text-[var(--accent)] truncate flex items-center gap-1 mt-1 max-w-full">
+                <span className="truncate">{sub.url}</span>
+                <ExternalLink size={11} className="flex-shrink-0" />
+              </a>
             </div>
-            <h3 className="font-display font-bold text-2xl tracking-tight">{c.title}</h3>
-            <p className="mt-2.5 text-sm text-[var(--text-dim)] leading-relaxed">{c.description}</p>
-            <ul className="mt-6 space-y-2">
-              {c.requirements.map((r, idx) => (
-                <li key={idx} className="flex items-start gap-2.5 text-xs text-[var(--text)]">
-                  <Check size={12} className="text-[var(--accent)] mt-0.5 flex-shrink-0" strokeWidth={3} />
-                  {r}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-7 pt-5 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--text-dim)]">
-              <span className="flex items-center gap-1.5"><Calendar size={12} /> Closes {fmtDate(c.endDate)}</span>
-              {c.active && <span className="text-[var(--text)] font-semibold">{daysLeft(c.endDate)}d left</span>}
-            </div>
-          </Card>
-        ))}
+            <Badge status={sub.status} />
+          </div>
+          <div className="flex items-center gap-3 mt-2.5 text-xs text-[var(--text-dim)]">
+            <span>{Number(verified ? sub.views : sub.claimedViews).toLocaleString()} views {verified ? '· verified' : '· your count'}</span>
+          </div>
+        </div>
       </div>
-
-      {filtered.length === 0 && (
-        <Card className="p-14 text-center">
-          <Trophy size={28} className="mx-auto text-[var(--text-faint)] mb-3" />
-          <p className="text-sm text-[var(--text-dim)]">No campaigns in this view.</p>
-        </Card>
-      )}
-    </div>
+    </Card>
   );
 };
 
-const CreatorHistory = ({ user, submissions, campaigns }) => {
+const CreatorRewards = () => (
+  <div className="space-y-8 md:space-y-10">
+    <div className="anim-fade-up">
+      <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">How it works</span>
+      <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Rewards & rules</h1>
+      <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place. 📌</p>
+    </div>
+    <Card className="p-6 md:p-8 anim-fade-up anim-d-100 max-w-2xl">
+      <RulesContent />
+    </Card>
+  </div>
+);
+
+const CreatorHistory = ({ submissions }) => {
   const [filter, setFilter] = useState('all');
-  const mine = submissions.filter((s) => s.creatorId === user.id);
+  const mine = submissions;
   const filtered = filter === 'all' ? mine : mine.filter((s) => s.status === filter);
 
   return (
@@ -1419,458 +1414,9 @@ const CreatorHistory = ({ user, submissions, campaigns }) => {
         </Card>
       ) : (
         <div className="space-y-2.5 anim-fade-up anim-d-200">
-          {filtered.map((s) => <SubmissionRow key={s.id} sub={s} campaign={campaigns.find((c) => c.id === s.campaignId)} />)}
+          {filtered.map((s) => <SubmissionRow key={s.id} sub={s} />)}
         </div>
       )}
-    </div>
-  );
-};
-
-// ============================================================================
-//  ADMIN APP
-// ============================================================================
-const AdminShell = ({ view, setView, onLogout, theme, setTheme, children }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const tabs = [
-    { k: 'a-dash',        label: 'Dashboard',   icon: BarChart3 },
-    { k: 'a-submissions', label: 'Submissions', icon: Inbox },
-    { k: 'a-creators',    label: 'Creators',    icon: Users },
-    { k: 'a-campaigns',   label: 'Campaigns',   icon: Trophy },
-  ];
-
-  return (
-    <div className="relative z-10 min-h-screen">
-      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[var(--bg)]/85 border-b border-[var(--border)]">
-        <div className="max-w-7xl mx-auto px-5 md:px-8 h-[68px] flex items-center justify-between">
-          <div className="flex items-center gap-10">
-            <div className="flex items-center gap-2.5">
-              <Logo small />
-              <span className="ml-1 text-[10px] uppercase tracking-[0.16em] font-bold text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-1 rounded">Admin</span>
-            </div>
-            <nav className="hidden lg:flex items-center gap-1">
-              {tabs.map((t) => (
-                <button
-                  key={t.k}
-                  onClick={() => setView(t.k)}
-                  className={`h-10 px-4 rounded-full text-sm font-semibold flex items-center gap-2 ${view === t.k ? 'bg-[var(--elev2)] text-[var(--text)]' : 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--elev1)]'}`}
-                >
-                  <t.icon size={14} strokeWidth={2.4} />
-                  {t.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle theme={theme} setTheme={setTheme} />
-            <Btn variant="ghost" size="sm" icon={LogOut} onClick={onLogout} className="hidden md:inline-flex">Log out</Btn>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden w-10 h-10 rounded-full bg-[var(--elev1)] border border-[var(--border)] hover:border-[var(--border-strong)] flex items-center justify-center">
-              {menuOpen ? <X size={16} /> : <Menu size={16} />}
-            </button>
-          </div>
-        </div>
-        {menuOpen && (
-          <div className="lg:hidden border-t border-[var(--border)] px-5 py-4 space-y-1 anim-fade-up">
-            {tabs.map((t) => (
-              <button
-                key={t.k}
-                onClick={() => { setView(t.k); setMenuOpen(false); }}
-                className={`w-full h-12 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 ${view === t.k ? 'bg-[var(--elev2)] text-[var(--text)]' : 'text-[var(--text-dim)]'}`}
-              >
-                <t.icon size={15} strokeWidth={2.4} />
-                {t.label}
-              </button>
-            ))}
-            <button onClick={() => { onLogout(); setMenuOpen(false); }} className="w-full h-12 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 text-[var(--danger)]">
-              <LogOut size={15} strokeWidth={2.4} />
-              Log out
-            </button>
-          </div>
-        )}
-      </header>
-      <main className="max-w-7xl mx-auto px-5 md:px-8 py-10 md:py-14">
-        {children}
-      </main>
-    </div>
-  );
-};
-
-const AdminDashboard = ({ creators, submissions, campaigns, setView }) => {
-  const pending  = submissions.filter((s) => s.status === 'pending').length;
-  const approved = submissions.filter((s) => s.status === 'approved').length;
-  const paidTotal = submissions.filter((s) => s.status === 'paid').reduce((sum, s) => sum + (s.payout || 0), 0);
-  const activeCampaigns = campaigns.filter((c) => c.active).length;
-
-  const recent = [...submissions].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)).slice(0, 5);
-
-  return (
-    <div className="space-y-10 md:space-y-12">
-      <div className="anim-fade-up">
-        <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Admin overview</span>
-        <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Dashboard</h1>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 anim-fade-up anim-d-100">
-        <Stat label="Total creators" value={creators.length} icon={Users} />
-        <Stat label="Pending review" value={pending} icon={Clock} />
-        <Stat label="Approved" value={approved} icon={CheckCircle2} />
-        <Stat label="Paid out" value={fmtMoney(paidTotal)} icon={Wallet} accent />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 anim-fade-up anim-d-200">
-        <Card className="p-6 md:p-7 lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-display font-bold text-xl tracking-tight">Recent submissions</h3>
-            <button onClick={() => setView('a-submissions')} className="text-sm font-semibold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1">
-              View all <ChevronRight size={14} />
-            </button>
-          </div>
-          {recent.length === 0 ? (
-            <p className="text-sm text-[var(--text-dim)] text-center py-8">No submissions yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {recent.map((s) => {
-                const creator = creators.find((c) => c.id === s.creatorId);
-                const campaign = campaigns.find((c) => c.id === s.campaignId);
-                return (
-                  <div key={s.id} className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--elev2)] hover:bg-[var(--bg)]">
-                    <div className="w-10 h-10 rounded-full bg-[var(--elev1)] flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                      {creator?.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold truncate">{creator?.name}</div>
-                      <div className="text-xs text-[var(--text-dim)] truncate mt-0.5">{campaign?.title}</div>
-                    </div>
-                    <Badge status={s.status} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-6 md:p-7">
-          <h3 className="font-display font-bold text-xl tracking-tight mb-6">Active campaigns</h3>
-          <div className="space-y-3">
-            {campaigns.filter((c) => c.active).map((c) => (
-              <div key={c.id} className="p-3.5 rounded-2xl bg-[var(--elev2)]">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-sm truncate">{c.title}</span>
-                  <span className="font-mono text-xs text-[var(--accent)] font-semibold">{fmtMoney(c.reward)}</span>
-                </div>
-                <div className="text-xs text-[var(--text-dim)]">{daysLeft(c.endDate)} days left</div>
-              </div>
-            ))}
-            <Btn variant="outline" size="sm" icon={Plus} onClick={() => setView('a-campaigns')} className="w-full mt-2">New campaign</Btn>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-const AdminSubmissions = ({ submissions, creators, campaigns, onUpdateStatus, onUpdateNotes }) => {
-  const [filter, setFilter] = useState('pending');
-  const [search, setSearch] = useState('');
-  const [editingNote, setEditingNote] = useState(null);
-  const [noteText, setNoteText] = useState('');
-
-  const filtered = submissions.filter((s) => {
-    if (filter !== 'all' && s.status !== filter) return false;
-    if (search) {
-      const c = creators.find((cr) => cr.id === s.creatorId);
-      const q = search.toLowerCase();
-      return (c?.name.toLowerCase().includes(q) || c?.tiktok.toLowerCase().includes(q) || c?.instagram.toLowerCase().includes(q));
-    }
-    return true;
-  });
-
-  const saveNote = (id) => { onUpdateNotes(id, noteText); setEditingNote(null); setNoteText(''); };
-
-  return (
-    <div className="space-y-8 md:space-y-10">
-      <div className="anim-fade-up">
-        <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Review queue</span>
-        <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Submissions</h1>
-        <p className="mt-3 text-[var(--text-dim)]">Review, approve, reject, mark as paid.</p>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-3 anim-fade-up anim-d-100">
-        <div className="flex gap-1 p-1 rounded-full bg-[var(--elev1)] border border-[var(--border)] overflow-x-auto no-scrollbar">
-          {[
-            { k: 'all',      l: 'All' },
-            { k: 'pending',  l: 'Pending' },
-            { k: 'approved', l: 'Approved' },
-            { k: 'rejected', l: 'Rejected' },
-            { k: 'paid',     l: 'Paid' },
-          ].map((t) => (
-            <button
-              key={t.k}
-              onClick={() => setFilter(t.k)}
-              className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap ${filter === t.k ? 'bg-[var(--accent)] text-black shadow-[0_4px_16px_-4px_var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}
-            >
-              {t.l}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 md:max-w-xs ml-auto">
-          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search creator…"
-            className="w-full h-11 pl-11 pr-4 rounded-full bg-[var(--elev1)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
-          />
-        </div>
-      </div>
-
-      {filtered.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Inbox size={28} className="mx-auto text-[var(--text-faint)] mb-3" />
-          <p className="text-sm text-[var(--text-dim)]">No submissions match your filters.</p>
-        </Card>
-      ) : (
-        <div className="space-y-3 anim-fade-up anim-d-200">
-          {filtered.map((s) => {
-            const creator = creators.find((c) => c.id === s.creatorId);
-            const campaign = campaigns.find((c) => c.id === s.campaignId);
-            return (
-              <Card key={s.id} className="p-5">
-                <div className="grid md:grid-cols-[1fr_auto] gap-4 items-start">
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="w-11 h-11 rounded-2xl bg-[var(--elev2)] flex items-center justify-center text-sm font-medium flex-shrink-0">
-                      {creator?.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{creator?.name}</span>
-                        <Badge status={s.status} />
-                      </div>
-                      <div className="mt-1 text-xs text-[var(--text-dim)] flex items-center gap-3 flex-wrap">
-                        <span className="flex items-center gap-1"><Music2 size={11} />{creator?.tiktok}</span>
-                        <span className="flex items-center gap-1"><Instagram size={11} />{creator?.instagram}</span>
-                        <span>· {fmtDate(s.submittedAt)}</span>
-                      </div>
-                      <div className="mt-2 text-sm font-medium">{campaign?.title} <span className="text-[var(--text-dim)] font-normal">· {fmtMoney(s.payout)}</span></div>
-                      <a href={s.url} target="_blank" rel="noreferrer" className="mt-1 text-xs text-[var(--text-dim)] hover:text-[var(--accent)] flex items-center gap-1 truncate">
-                        <PlatformIcon platform={s.platform} size={11} />
-                        <span className="truncate">{s.url}</span>
-                        <ExternalLink size={11} className="flex-shrink-0" />
-                      </a>
-
-                      {editingNote === s.id ? (
-                        <div className="mt-3 flex gap-2">
-                          <input
-                            value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
-                            placeholder="Add a note…"
-                            className="flex-1 h-9 px-3 rounded-xl bg-[var(--elev2)] border border-[var(--border)] text-xs focus:outline-none focus:border-[var(--accent)]"
-                          />
-                          <Btn size="sm" onClick={() => saveNote(s.id)}>Save</Btn>
-                          <Btn size="sm" variant="ghost" onClick={() => { setEditingNote(null); setNoteText(''); }}>×</Btn>
-                        </div>
-                      ) : (
-                        <button onClick={() => { setEditingNote(s.id); setNoteText(s.notes || ''); }} className="mt-2 text-xs text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1 transition-colors">
-                          <Edit3 size={10} />
-                          {s.notes ? <span className="italic">"{s.notes}"</span> : 'Add note'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex md:flex-col gap-2 md:items-end">
-                    {s.status === 'pending' && (
-                      <>
-                        <Btn size="sm" variant="success" icon={Check} onClick={() => onUpdateStatus(s.id, 'approved')}>Approve</Btn>
-                        <Btn size="sm" variant="danger"  icon={X}     onClick={() => onUpdateStatus(s.id, 'rejected')}>Reject</Btn>
-                      </>
-                    )}
-                    {s.status === 'approved' && (
-                      <Btn size="sm" icon={Banknote} onClick={() => onUpdateStatus(s.id, 'paid')}>Mark paid</Btn>
-                    )}
-                    {(s.status === 'rejected' || s.status === 'paid') && (
-                      <Btn size="sm" variant="ghost" onClick={() => onUpdateStatus(s.id, 'pending')}>Reopen</Btn>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const AdminCreators = ({ creators, submissions }) => {
-  const [search, setSearch] = useState('');
-  const filtered = creators.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.tiktok.toLowerCase().includes(q);
-  });
-
-  return (
-    <div className="space-y-8 md:space-y-10">
-      <div className="anim-fade-up flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Creator directory</span>
-          <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Creators</h1>
-          <p className="mt-3 text-[var(--text-dim)]">{creators.length} active accounts.</p>
-        </div>
-        <div className="relative">
-          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search creators…"
-            className="w-72 max-w-full h-11 pl-11 pr-4 rounded-full bg-[var(--elev1)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 anim-fade-up anim-d-100">
-        {filtered.map((c) => {
-          const subs = submissions.filter((s) => s.creatorId === c.id);
-          const earned = subs.filter((s) => s.status === 'paid').reduce((sum, s) => sum + (s.payout || 0), 0);
-          return (
-            <Card key={c.id} interactive className="p-5 md:p-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-[var(--elev2)] flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                  {c.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold truncate">{c.name}</div>
-                  <div className="text-xs text-[var(--text-dim)] truncate mt-0.5">{c.email}</div>
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                <div className="p-3 rounded-xl bg-[var(--elev2)]">
-                  <div className="text-[var(--text-dim)] flex items-center gap-1 mb-1"><Music2 size={11} /> TikTok</div>
-                  <div className="font-semibold truncate">{c.tiktok}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[var(--elev2)]">
-                  <div className="text-[var(--text-dim)] flex items-center gap-1 mb-1"><Instagram size={11} /> Instagram</div>
-                  <div className="font-semibold truncate">{c.instagram}</div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between text-xs">
-                <span className="text-[var(--text-dim)]">{subs.length} submissions</span>
-                <span className="font-mono text-[var(--accent)] font-semibold">{fmtMoney(earned)} earned</span>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <Card className="p-14 text-center">
-          <Users size={28} className="mx-auto text-[var(--text-faint)] mb-3" />
-          <p className="text-sm text-[var(--text-dim)]">No creators match your search.</p>
-        </Card>
-      )}
-    </div>
-  );
-};
-
-const AdminCampaigns = ({ campaigns, onSave, onDelete, onToggleActive }) => {
-  const blank = { id: null, title: '', reward: 0, bonus: 0, description: '', requirements: '', startDate: '', endDate: '', active: true };
-  const [editing, setEditing] = useState(null);
-
-  const startNew = () => setEditing(blank);
-  const startEdit = (c) => setEditing({ ...c, requirements: c.requirements.join('\n') });
-  const save = () => {
-    if (!editing.title) return;
-    const payload = {
-      ...editing,
-      reward: Number(editing.reward) || 0,
-      bonus: Number(editing.bonus) || 0,
-      requirements: editing.requirements.split('\n').map((s) => s.trim()).filter(Boolean),
-    };
-    onSave(payload);
-    setEditing(null);
-  };
-
-  return (
-    <div className="space-y-8 md:space-y-10">
-      <div className="anim-fade-up flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Manage rewards</span>
-          <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Campaigns</h1>
-          <p className="mt-3 text-[var(--text-dim)]">Create, edit, toggle weekly rewards.</p>
-        </div>
-        <Btn icon={Plus} onClick={startNew}>New campaign</Btn>
-      </div>
-
-      {editing && (
-        <Card className="p-6 anim-fade-up">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-display font-bold text-xl tracking-tight">{editing.id ? 'Edit campaign' : 'New campaign'}</h3>
-            <button onClick={() => setEditing(null)} className="w-9 h-9 rounded-full bg-[var(--elev2)] hover:bg-[var(--elev1)] flex items-center justify-center"><X size={15} /></button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Campaign title" placeholder="Launch Week Sprint" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
-            <Field label="Reward ($)" type="number" placeholder="250" value={editing.reward} onChange={(e) => setEditing({ ...editing, reward: e.target.value })} />
-            <Field label="Bonus ($, optional)" type="number" placeholder="500" value={editing.bonus} onChange={(e) => setEditing({ ...editing, bonus: e.target.value })} />
-            <div /> {/* spacer */}
-            <Field label="Start date" type="date" value={editing.startDate} onChange={(e) => setEditing({ ...editing, startDate: e.target.value })} />
-            <Field label="End date"   type="date" value={editing.endDate}   onChange={(e) => setEditing({ ...editing, endDate: e.target.value })} />
-            <div className="md:col-span-2">
-              <Textarea label="Description" placeholder="What should creators post?" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
-            </div>
-            <div className="md:col-span-2">
-              <Textarea label="Requirements (one per line)" placeholder={'Post 1 TikTok or Reel\nTag @madintel\nHit 5,000+ views in 72 hours'} value={editing.requirements} onChange={(e) => setEditing({ ...editing, requirements: e.target.value })} />
-            </div>
-            <div className="md:col-span-2 flex items-center justify-between">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <span className="text-xs uppercase tracking-[0.08em] font-medium text-[var(--text-dim)]">Active</span>
-                <button
-                  type="button"
-                  onClick={() => setEditing({ ...editing, active: !editing.active })}
-                  className={`w-11 h-6 rounded-full transition-all relative ${editing.active ? 'bg-[var(--accent)]' : 'bg-[var(--elev2)]'}`}
-                >
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${editing.active ? 'left-[22px]' : 'left-0.5'}`} />
-                </button>
-              </label>
-              <div className="flex items-center gap-2">
-                <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
-                <Btn onClick={save} icon={Check}>{editing.id ? 'Save' : 'Create'}</Btn>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 anim-fade-up anim-d-100">
-        {campaigns.map((c) => (
-          <Card key={c.id} className="p-6">
-            <div className="flex items-start justify-between mb-3">
-              <Badge status={c.active ? 'active' : 'ended'} />
-              <div className="text-right">
-                <div className="font-display font-bold text-2xl text-[var(--accent)]">{fmtMoney(c.reward)}</div>
-                {c.bonus > 0 && <div className="text-xs text-[var(--text-dim)]">+ {fmtMoney(c.bonus)} bonus</div>}
-              </div>
-            </div>
-            <h3 className="font-display font-bold text-xl tracking-tight">{c.title}</h3>
-            <p className="mt-2 text-sm text-[var(--text-dim)] leading-relaxed line-clamp-2">{c.description}</p>
-            <div className="mt-4 text-xs text-[var(--text-dim)] flex items-center gap-3 flex-wrap">
-              <span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(c.startDate)} – {fmtDate(c.endDate)}</span>
-              <span>· {c.requirements.length} requirements</span>
-            </div>
-            <div className="mt-5 pt-4 border-t border-[var(--border)] flex items-center justify-between gap-2 flex-wrap">
-              <button onClick={() => onToggleActive(c.id)} className="text-xs text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-2 transition-colors">
-                <span className={`w-9 h-5 rounded-full relative transition-all ${c.active ? 'bg-[var(--accent)]' : 'bg-[var(--elev2)]'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${c.active ? 'left-[18px]' : 'left-0.5'}`} />
-                </span>
-                {c.active ? 'Active' : 'Inactive'}
-              </button>
-              <div className="flex items-center gap-1.5">
-                <Btn size="sm" variant="ghost" icon={Edit3} onClick={() => startEdit(c)}>Edit</Btn>
-                <Btn size="sm" variant="ghost" icon={Trash2} onClick={() => { if (confirm(`Delete "${c.title}"?`)) onDelete(c.id); }}>Delete</Btn>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 };
@@ -1881,54 +1427,49 @@ const AdminCampaigns = ({ campaigns, onSave, onDelete, onToggleActive }) => {
 const App = () => {
   const [view, setView] = useState('landing');
   const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [theme, setTheme] = useState('light');
   const [inviteCode, setInviteCode] = useState('');
 
-  const [creators, setCreators] = useState([]);
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [submissions, setSubmissions] = useState([]);
-  const [deal, setDeal] = useState(null); // the active reward campaign (tiers + examples)
+  const [payouts, setPayouts] = useState([]);
+  const [deal, setDeal] = useState(null); // active campaign row — only used for example videos now
 
   // ─── SUPABASE SERVICE LAYER ───
-  // Recent submissions + creators load live. Campaigns stay local (no table).
-  const loadSubmissions = async () => {
-    const { data, error } = await supabase
-      .from('video_submissions')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setSubmissions(data.map(mapSubmissionRow));
+  // A creator only ever loads their OWN videos + payouts (RLS enforces this too).
+  const loadMine = async (uid) => {
+    const [subs, pays] = await Promise.all([
+      supabase.from('video_submissions').select('*').eq('creator_id', uid).order('created_at', { ascending: false }),
+      supabase.from('payouts').select('*').eq('creator_id', uid).order('paid_at', { ascending: false }),
+    ]);
+    if (!subs.error && subs.data) setSubmissions(subs.data.map(mapSubmissionRow));
+    if (!pays.error && pays.data) setPayouts(pays.data);
   };
 
   useEffect(() => {
     if (typeof window !== 'undefined') console.info('[madrewards] talking to Supabase at:', SUPABASE_URL_IN_USE);
     (async () => {
       try {
-        const [subs, crs, dl] = await Promise.all([
-          supabase.from('video_submissions').select('*').order('created_at', { ascending: false }),
-          supabase.from('creators').select('*').order('created_at', { ascending: false }),
-          supabase.from('campaigns').select('*').eq('active', true).limit(1).maybeSingle(),
-        ]);
-        if (!subs.error && subs.data) setSubmissions(subs.data.map(mapSubmissionRow));
-        if (!crs.error && crs.data) setCreators(crs.data.map(mapCreatorRow));
-        if (!dl.error && dl.data) setDeal(dl.data);
+        const { data } = await supabase.from('campaigns').select('*').eq('active', true).limit(1).maybeSingle();
+        if (data) setDeal(data);
       } catch (e) {
         console.error('[madrewards] initial load failed:', friendlyError(e));
       }
     })();
   }, []);
 
+  const enterAs = async (authUser) => {
+    const { data: cr } = await supabase.from('creators').select('*').eq('id', authUser.id).maybeSingle();
+    setUser(cr ? mapCreatorRow(cr) : { id: authUser.id, name: (authUser.email || 'creator').split('@')[0], email: authUser.email, rulesAccepted: false });
+    setView('dash');
+    await loadMine(authUser.id);
+  };
+
   // Restore a logged-in session on load (real Supabase Auth accounts).
   useEffect(() => {
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        const sUser = data?.session?.user;
-        if (sUser) {
-          const { data: cr } = await supabase.from('creators').select('*').eq('id', sUser.id).maybeSingle();
-          setUser(cr ? mapCreatorRow(cr) : { id: sUser.id, name: (sUser.email || 'creator').split('@')[0], email: sUser.email });
-          setView('dash');
-        }
+        if (data?.session?.user) await enterAs(data.session.user);
       } catch (e) {
         console.error('[madrewards] session restore failed:', friendlyError(e));
       }
@@ -1940,11 +1481,7 @@ const App = () => {
     const em = (email || '').trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({ email: em, password });
     if (error) throw new Error('Wrong email or password.');
-    const uid = data.user.id;
-    const { data: cr } = await supabase.from('creators').select('*').eq('id', uid).maybeSingle();
-    setUser(cr ? mapCreatorRow(cr) : { id: uid, name: em.split('@')[0], email: em });
-    setView('dash');
-    await loadSubmissions();
+    await enterAs(data.user);
   };
 
   // Validate an invite code (server-side; codes are not public-readable).
@@ -1991,16 +1528,25 @@ const App = () => {
     if (error) throw new Error(friendlyError(error));
   };
 
-  const handleAdminLogin = () => { setIsAdmin(true); setView('a-dash'); };
-  const handleLogout = async () => { try { await supabase.auth.signOut(); } catch {} setUser(null); setIsAdmin(false); setView('landing'); };
+  const handleLogout = async () => {
+    try { await supabase.auth.signOut(); } catch {}
+    setUser(null); setSubmissions([]); setPayouts([]); setView('landing');
+  };
+
+  // Creator swiped to agree to the rules.
+  const acceptRules = async () => {
+    const { error } = await supabase.rpc('accept_rules');
+    if (error) throw error;
+    setUser((u) => ({ ...u, rulesAccepted: true }));
+  };
 
   // Insert into video_submissions. Throws a specific message on failure.
   const handleNewSubmission = async (data) => {
     let error;
     try {
       ({ error } = await supabase.from('video_submissions').insert({
-        creator_id: data.creatorId,
-        video_url: data.url,
+        creator_id: user.id,
+        video_url: normalizeVideoUrl(data.url),
         platform: data.platform,
         posted_at: data.postedAt || null,
         claimed_views: Number(data.claimedViews) || 0,
@@ -2008,27 +1554,10 @@ const App = () => {
     } catch (e) {
       throw new Error(friendlyError(e)); // network/DNS failures land here
     }
+    if (error?.code === '23505') throw new Error('That video was already submitted.');
     if (error) throw new Error(friendlyError(error));
-    await loadSubmissions();
+    await loadMine(user.id);
   };
-
-  // Admin write-backs stay local until the protected admin route exists.
-  const updateStatus = (id, status) => {
-    setSubmissions((subs) => subs.map((s) => s.id === id ? { ...s, status } : s));
-  };
-  const updateNotes = (id, notes) => {
-    setSubmissions((subs) => subs.map((s) => s.id === id ? { ...s, notes } : s));
-  };
-
-  const saveCampaign = (data) => {
-    if (data.id) {
-      setCampaigns((cs) => cs.map((c) => c.id === data.id ? data : c));
-    } else {
-      setCampaigns((cs) => [{ ...data, id: uid('cmp') }, ...cs]);
-    }
-  };
-  const deleteCampaign = (id) => setCampaigns((cs) => cs.filter((c) => c.id !== id));
-  const toggleActive = (id) => setCampaigns((cs) => cs.map((c) => c.id === id ? { ...c, active: !c.active } : c));
 
   const go = (v) => setView(v);
 
@@ -2049,9 +1578,10 @@ const App = () => {
   } else if (user) {
     body = (
       <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
-        {view === 'dash'    && <CreatorDashboard user={user} deal={deal} submissions={submissions} onSubmit={handleNewSubmission} setView={setView} />}
-        {view === 'rewards' && <CreatorRewards   campaigns={campaigns} />}
-        {view === 'history' && <CreatorHistory   user={user} submissions={submissions} campaigns={campaigns} />}
+        {view === 'dash'    && <CreatorDashboard user={user} deal={deal} submissions={submissions} payouts={payouts} onSubmit={handleNewSubmission} setView={setView} />}
+        {view === 'rewards' && <CreatorRewards />}
+        {view === 'history' && <CreatorHistory submissions={submissions} />}
+        {!user.rulesAccepted && <RulesGate user={user} onAccept={acceptRules} />}
       </CreatorShell>
     );
   } else {
