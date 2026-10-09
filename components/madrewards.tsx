@@ -259,6 +259,12 @@ const ThemeStyles = () => (
 
     .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; }
 
+    /* ── leak protection ── */
+    .leak-guard { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .leak-guard input, .leak-guard textarea { -webkit-user-select: text; user-select: text; }
+    .leak-blur > *:not(style) { filter: blur(22px); }
+    @media print { .leak-guard { display: none !important; } }
+
     /* ── game layer: bright, glossy, bubbly ── */
     :root { --ink: #f5f5f5; --lime: #C6FF3D; --grape: #7B5CFF; --gum: #FF4FB8; --sun: #FFD23F; --sky: #38BDF8;
             --card: #17171b; --card-line: rgba(255,255,255,0.08); }
@@ -916,8 +922,58 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
       <main className="max-w-6xl mx-auto px-5 md:px-8 py-10 md:py-14">
         {children}
       </main>
+      <Watermark user={user} />
     </div>
   );
+};
+
+// ────────────────────────── LEAK PROTECTION ──────────────────────────
+// No website can truly block a phone screenshot, so we make leaks traceable
+// (name watermark on every page) and harder (blur when the app/tab loses focus,
+// no text copying, no right-click, blank when printed).
+const Watermark = ({ user }) => {
+  const label = [user.name, user.tiktok && `@${String(user.tiktok).replace(/^@/, '')}`].filter(Boolean).join(' · ') || user.email || 'Mad Rewards';
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='170'><text x='10' y='95' transform='rotate(-24 150 85)' font-family='sans-serif' font-size='15' font-weight='700' fill='rgb(127,127,127)'>${label.replace(/[<>&'"]/g, '')}</text></svg>`;
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-0 z-[60] pointer-events-none select-none"
+      style={{ backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`, opacity: 0.09 }}
+    />
+  );
+};
+
+const useLeakGuard = (on) => {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const hide = () => setHidden(true);
+    const show = () => setHidden(document.visibilityState === 'hidden');
+    const vis = () => setHidden(document.visibilityState === 'hidden');
+    const block = (e) => e.preventDefault();
+    const keys = (e) => {
+      // PrintScreen and common screenshot / save / print shortcuts
+      if (e.key === 'PrintScreen' || ((e.metaKey || e.ctrlKey) && ['p', 's'].includes(e.key.toLowerCase())) || (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key))) {
+        e.preventDefault(); hide(); setTimeout(show, 1500);
+        try { navigator.clipboard?.writeText(''); } catch {}
+      }
+    };
+    window.addEventListener('blur', hide);
+    window.addEventListener('focus', show);
+    document.addEventListener('visibilitychange', vis);
+    document.addEventListener('contextmenu', block);
+    document.addEventListener('copy', block);
+    window.addEventListener('keydown', keys);
+    return () => {
+      window.removeEventListener('blur', hide);
+      window.removeEventListener('focus', show);
+      document.removeEventListener('visibilitychange', vis);
+      document.removeEventListener('contextmenu', block);
+      document.removeEventListener('copy', block);
+      window.removeEventListener('keydown', keys);
+    };
+  }, [on]);
+  return hidden;
 };
 
 // ────────────────────────── RULES (shown in the swipe-to-agree popup + Rewards tab) ──────────────────────────
@@ -942,6 +998,11 @@ const Row = ({ left, right }) => (
 
 const RulesContent = () => (
   <div className="space-y-9 text-sm leading-relaxed">
+    <div className="gloss g-grape rounded-[24px] p-5 text-white">
+      <div className="font-arcade text-xl">🤫 You've been personally invited</div>
+      <p className="mt-1.5">Mad Rewards is invite-only. You're one of a small group of creators we picked, and this offer is just for you.</p>
+    </div>
+
     <Sec title="How it works 💸">
       <ol className="space-y-1.5">
         <li>1️⃣ Post your Mad Labs videos <b>Sunday → Saturday</b></li>
@@ -962,16 +1023,16 @@ const RulesContent = () => (
       </div>
 
       <div>
-        <div className="font-bold mb-1">💎 Weekly max</div>
-        <p>The most you can earn from views in one week is <b>{fmtCash(WEEKLY_CAP)}</b> ({fmtViews(CAP_VIEWS)} views). Views past that still count toward merch and the big prizes.</p>
-      </div>
-
-      <div>
         <div className="font-bold mb-1">🎁 Extras</div>
         <Row left="😎 Mad Labs logo as your pfp" right={`+${fmtCash(LOGO_PFP_BONUS)}/week`} />
         <Row left={`📦 ${REUP_VIDEOS} videos in 2 weeks`} right="Free re-up" />
         {MILESTONES.map((ms) => <Row key={ms.views} left={`${ms.emoji} ${fmtViews(ms.views)} total views`} right={ms.label} />)}
         {MONTHLY_PRIZES.map((p) => <Row key={p.views} left={`${p.emoji} ${fmtViews(p.views)} views in one month`} right={p.label} />)}
+      </div>
+
+      <div className="rounded-[24px] p-4 bg-[var(--elev2)]">
+        <div className="font-bold mb-1">💎 Weekly cap</div>
+        <p>You can earn up to <b>{fmtCash(WEEKLY_CAP)} a week</b> from views (that's {fmtViews(CAP_VIEWS)} views). Anything past that still counts toward free merch and the big prizes.</p>
       </div>
     </Sec>
 
@@ -991,6 +1052,16 @@ const RulesContent = () => (
       <div className="gloss g-sun rounded-[24px] p-4 text-black">
         <div className="font-arcade text-base">🏷️ The #1 rule</div>
         <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. 🤝</p>
+      </div>
+
+      <div className="rounded-[24px] p-4 border-2 border-[var(--danger)] bg-[var(--danger)]/10">
+        <div className="font-arcade text-base">🤐 Keep it secret</div>
+        <ul className="mt-1.5 space-y-1">
+          <li>📵 No screenshots or screen recordings of this site.</li>
+          <li>🙊 Don't post, share or send anything from here. Not online, not in DMs.</li>
+          <li>🎬 Never mention Mad Rewards, your payouts or this program in any video, caption, comment or story.</li>
+          <li>Every page is marked with your name. Leak it = you're out. 🚪</li>
+        </ul>
       </div>
 
       <ul className="space-y-2">
@@ -1288,7 +1359,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         {[
           { emoji: '📦', title: 'Free re-up', sub: `Post ${REUP_VIDEOS} videos by ${fmtDay(reup.end)}`, pill: reup.videos >= REUP_VIDEOS ? 'Earned ✓' : `${reup.videos}/${REUP_VIDEOS}`, done: reup.videos >= REUP_VIDEOS },
           { emoji: '😎', title: 'Logo pfp', sub: 'Make the Mad Labs logo your profile pic', pill: `+${fmtCash(LOGO_PFP_BONUS)}/wk`, done: false },
-          { emoji: '💎', title: 'Weekly max', sub: `Up to ${fmtCash(WEEKLY_CAP)} a week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
+          { emoji: '💎', title: 'Weekly cap', sub: `Up to ${fmtCash(WEEKLY_CAP)} a week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
           { emoji: '🤑', title: 'Paid to you', sub: 'All-time, straight to your Cash App', pill: fmtCash(paidTotal), done: false },
         ].map((q) => (
           <div key={q.title} className="flex items-center gap-3 rounded-[22px] p-3 hover:bg-[var(--elev2)]">
@@ -1671,6 +1742,10 @@ const App = () => {
 
   const go = (v) => setView(v);
 
+  // Logged-in creator pages: blur when focus leaves, no copying.
+  const guarded = !!user && !['landing', 'login', 'invite', 'signup', 'request'].includes(view);
+  const leakHidden = useLeakGuard(guarded);
+
   // ─── RENDER ───
   let body;
   if (view === 'landing') {
@@ -1699,7 +1774,7 @@ const App = () => {
   }
 
   return (
-    <div className={`madvault-root ${theme === 'light' ? 'light' : ''}`}>
+    <div className={`madvault-root ${theme === 'light' ? 'light' : ''} ${guarded ? 'leak-guard' : ''} ${guarded && leakHidden ? 'leak-blur' : ''}`}>
       <ThemeStyles />
       {body}
     </div>
