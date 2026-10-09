@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
-import { sendEmail, SITE_URL } from '@/lib/email'
+import { sendEmail, emailConfigured, SITE_URL } from '@/lib/email'
+import { sendSms, smsConfigured } from '@/lib/sms'
 
 // Server-only. Service key never reaches the browser; it bypasses RLS for admin edits.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -77,13 +78,14 @@ export async function POST(req: Request) {
 
   // ---- list everything ----
   if (body.action === 'list') {
-    const [creators, submissions, campaigns, invites, requests, payouts] = await Promise.all([
+    const [creators, submissions, campaigns, invites, requests, payouts, announcements] = await Promise.all([
       admin.from('creators').select('*').order('created_at', { ascending: false }),
       admin.from('video_submissions').select('*').order('created_at', { ascending: false }),
       admin.from('campaigns').select('*').order('created_at', { ascending: false }),
       admin.from('invite_codes').select('*').order('created_at', { ascending: false }),
       admin.from('signup_requests').select('*').order('created_at', { ascending: false }),
       admin.from('payouts').select('*').order('paid_at', { ascending: false }),
+      admin.from('announcements').select('*').order('created_at', { ascending: false }),
     ])
     const err = creators.error || submissions.error || campaigns.error || invites.error || requests.error || payouts.error
     if (err) return NextResponse.json({ error: err.message }, { status: 500 })
@@ -94,6 +96,9 @@ export async function POST(req: Request) {
       invites: invites.data,
       requests: requests.data,
       payouts: payouts.data,
+      announcements: announcements.error ? [] : announcements.data,
+      emailReady: emailConfigured(),
+      smsReady: smsConfigured(),
     })
   }
 
@@ -155,6 +160,43 @@ export async function POST(req: Request) {
         .gte('posted_at', p.period_start).lte('posted_at', end + 'T23:59:59')
     }
     const { error } = await admin.from('payouts').delete().eq('id', p.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ---- announcement: dashboard banner + optional email + optional text ----
+  if (body.action === 'announce') {
+    const title = String(body.title || '').trim()
+    const text = String(body.body || '').trim()
+    if (!title) return NextResponse.json({ error: 'Add a title' }, { status: 400 })
+    if (body.banner) {
+      const ins = await admin.from('announcements').insert({ title, body: text || null })
+      if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 })
+    }
+    const cr = await admin.from('creators').select('name, email, phone, sms_opt_in')
+    if (cr.error) return NextResponse.json({ error: cr.error.message }, { status: 500 })
+    const people = cr.data || []
+    let emailed = 0, texted = 0
+    if (body.email) {
+      const rs = await Promise.all(people.filter((c) => c.email).map((c) => sendEmail(
+        c.email, title,
+        `<p>Hi ${String(c.name || '').split(' ')[0].replace(/[<>&]/g, '') || 'there'},</p>
+         <p><b>${title.replace(/[<>&]/g, '')}</b></p>${text ? `<p>${text.replace(/[<>&]/g, '').replace(/\n/g, '<br>')}</p>` : ''}
+         <p><a href="${SITE_URL}/#dash">Open Mad Rewards</a></p>`,
+      )))
+      emailed = rs.filter(Boolean).length
+    }
+    if (body.sms) {
+      const msg = `Mad Rewards: ${title}${text ? ` ${text}` : ''} ${SITE_URL} Reply STOP to opt out.`
+      const rs = await Promise.all(people.filter((c) => c.sms_opt_in && c.phone).map((c) => sendSms(c.phone, msg)))
+      texted = rs.filter(Boolean).length
+    }
+    return NextResponse.json({ ok: true, emailed, texted })
+  }
+
+  if (body.action === 'announcement_hide') {
+    if (!body.id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const { error } = await admin.from('announcements').update({ active: false }).eq('id', body.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   }

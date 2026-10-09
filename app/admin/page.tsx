@@ -24,6 +24,7 @@ type Campaign = {
 }
 type Payout = { id: string; creator_id: string; period: 'week' | 'month'; period_start: string; amount: number; label: string | null; details: any; paid_at: string }
 type Invite = { id: string; code: string; note: string | null; used: boolean; used_email: string | null; created_at: string; used_at: string | null }
+type Announcement = { id: string; title: string; body: string | null; active: boolean; created_at: string }
 type ReqRow = { id: string; name: string; email: string; tiktok_handle: string | null; instagram_handle: string | null; note: string | null; status: string; invite_code: string | null; created_at: string }
 
 const STATUS = ['pending', 'approved', 'rejected']
@@ -94,10 +95,14 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
+  const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests' | 'announce'>('overview')
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [ready, setReady] = useState({ email: false, sms: false })
+  const [ann, setAnn] = useState({ title: '', body: '', banner: true, email: true, sms: true })
+  const [annMsg, setAnnMsg] = useState('')
   const [copied, setCopied] = useState('')
   const [picked, setPicked] = useState<Record<string, boolean>>({})
-  const [ask, setAsk] = useState<{ title: string; body: string; onYes: () => Promise<void> } | null>(null)
+  const [ask, setAsk] = useState<{ title: string; body: string; yesLabel?: string; onYes: () => Promise<void> } | null>(null)
   const [asking, setAsking] = useState(false)
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
 
@@ -120,6 +125,8 @@ export default function AdminPage() {
     setInvites(data.invites ?? [])
     setRequests(data.requests ?? [])
     setPayouts(data.payouts ?? [])
+    setAnnouncements(data.announcements ?? [])
+    setReady({ email: !!data.emailReady, sms: !!data.smsReady })
   }
 
   const login = async (e: React.FormEvent) => {
@@ -156,6 +163,28 @@ export default function AdminPage() {
     if (!confirm('Undo this payment? The videos go back to "approved".')) return
     setError('')
     try { await call({ action: 'unmark_paid', id }); await load() } catch (err: any) { setError(err.message) }
+  }
+
+  // ----- announcements -----
+  const sendAnnouncement = () => {
+    if (!ann.title.trim()) { setError('Add a title for the announcement.'); return }
+    const where = [ann.banner && 'dashboard banner', ann.email && 'email', ann.sms && 'text'].filter(Boolean).join(', ')
+    setAsk({
+      title: 'Send this announcement?',
+      body: `"${ann.title}" goes out by: ${where || 'nothing selected'}.`,
+      yesLabel: 'Yes, send',
+      onYes: async () => {
+        setError(''); setAnnMsg('')
+        try {
+          const r = await call({ action: 'announce', ...ann })
+          setAnnMsg(`Sent. ${ann.banner ? 'Banner is live. ' : ''}${ann.email ? `${r.emailed} emailed. ` : ''}${ann.sms ? `${r.texted} texted.` : ''}`)
+          setAnn({ ...ann, title: '', body: '' }); await load()
+        } catch (err: any) { setError(err.message) }
+      },
+    })
+  }
+  const hideAnnouncement = async (id: string) => {
+    try { await call({ action: 'announcement_hide', id }); await load() } catch (err: any) { setError(err.message) }
   }
 
   // ----- deletes (confirmed with the Yes/No box) -----
@@ -349,10 +378,11 @@ export default function AdminPage() {
     { id: 'campaign', label: 'Rewards', d: Ico.gift, badge: undefined },
     { id: 'requests', label: 'Requests', d: Ico.inbox, badge: pendingReqs || undefined },
     { id: 'invites', label: 'Invites', d: Ico.ticket, badge: unusedInvites || undefined },
+    { id: 'announce', label: 'Announcements', d: Ico.spark, badge: undefined },
     { id: 'creators', label: 'Creators', d: Ico.users, badge: creators.length || undefined },
   ] as const
 
-  const titleFor: Record<string, string> = { overview: 'Overview', payouts: 'Weekly pay', campaign: 'Rewards', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests' }
+  const titleFor: Record<string, string> = { overview: 'Overview', payouts: 'Weekly pay', campaign: 'Rewards', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests', announce: 'Announcements' }
 
   return (
     <div className="madx" style={vars}>
@@ -792,6 +822,49 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ===== ANNOUNCEMENTS ===== */}
+        {tab === 'announce' && (
+          <>
+            <div className="card pad" style={{ marginBottom: 16 }}>
+              <div className="card-h">New announcement</div>
+              <div className="muted" style={{ marginTop: 4 }}>e.g. "This week's rate is doubled" or "New prize: trip to Mexico".</div>
+              <label className="field" style={{ marginTop: 16, display: 'block' }}>
+                <span className="flabel">Title</span>
+                <input value={ann.title} maxLength={80} onChange={(e) => setAnn({ ...ann, title: e.target.value })} className="input" style={{ width: '100%' }} placeholder="This week's rate is doubled" />
+              </label>
+              <label className="field" style={{ marginTop: 12, display: 'block' }}>
+                <span className="flabel">Details (optional)</span>
+                <textarea value={ann.body} maxLength={300} onChange={(e) => setAnn({ ...ann, body: e.target.value })} className="input" rows={3} style={{ width: '100%', height: 'auto', padding: 12 }} placeholder="$200 per 100K views this week only. Submit by Saturday 11:59pm." />
+              </label>
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 14 }}>
+                <label className="field check"><input type="checkbox" checked={ann.banner} onChange={(e) => setAnn({ ...ann, banner: e.target.checked })} /><span>Banner on dashboard</span></label>
+                <label className="field check"><input type="checkbox" checked={ann.email} onChange={(e) => setAnn({ ...ann, email: e.target.checked })} /><span>Email everyone{!ready.email && ' (not set up)'}</span></label>
+                <label className="field check"><input type="checkbox" checked={ann.sms} onChange={(e) => setAnn({ ...ann, sms: e.target.checked })} /><span>Text opted-in ({creators.filter((c: any) => c.sms_opt_in).length}){!ready.sms && ' (not set up)'}</span></label>
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 18 }}>
+                <button className="btn btn-primary" onClick={sendAnnouncement}>Send announcement</button>
+                {annMsg && <span className="muted">{annMsg}</span>}
+              </div>
+            </div>
+            <div className="card table-scroll">
+              <table className="tbl">
+                <thead><tr><th>Announcement</th><th>Sent</th><th>Banner</th><th></th></tr></thead>
+                <tbody>
+                  {announcements.map((a) => (
+                    <tr key={a.id}>
+                      <td><b>{a.title}</b>{a.body && <div className="muted" style={{ fontSize: 13 }}>{a.body}</div>}</td>
+                      <td className="muted">{fmtDate(a.created_at)}</td>
+                      <td>{a.active ? <span className="pill paid">showing</span> : <span className="muted">hidden</span>}</td>
+                      <td>{a.active && <button className="btn btn-ghost sm" onClick={() => hideAnnouncement(a.id)}>Hide banner</button>}</td>
+                    </tr>
+                  ))}
+                  {announcements.length === 0 && <tr><td className="empty" colSpan={4}>No announcements yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
         {/* ===== INVITES ===== */}
         {tab === 'invites' && (
           <>
@@ -839,8 +912,8 @@ export default function AdminPage() {
             <p className="muted" style={{ marginTop: 8, wordBreak: 'break-word' }}>{ask.body}</p>
             <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
               <button className="btn btn-ghost" disabled={asking} onClick={() => setAsk(null)} autoFocus>No</button>
-              <button className="btn btn-danger" disabled={asking} onClick={async () => { setAsking(true); await ask.onYes(); setAsking(false); setAsk(null) }}>
-                {asking ? 'Deleting…' : 'Yes, delete'}
+              <button className={ask.yesLabel ? 'btn btn-primary' : 'btn btn-danger'} disabled={asking} onClick={async () => { setAsking(true); await ask.onYes(); setAsking(false); setAsk(null) }}>
+                {asking ? 'Working…' : ask.yesLabel || 'Yes, delete'}
               </button>
             </div>
           </div>

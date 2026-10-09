@@ -783,7 +783,7 @@ const InvitePage = ({ go, onValid, initialCode = '' }) => {
 };
 
 const SignupPage = ({ go, code, onSignup }) => {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', cashapp: '', password: '', confirm: '', tiktok: '', instagram: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', cashapp: '', password: '', confirm: '', tiktok: '', instagram: '', smsOptIn: false });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -792,6 +792,7 @@ const SignupPage = ({ go, code, onSignup }) => {
     if (!form.name || !form.email || !form.password) { setError('Name, email and password are required.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
+    if (form.smsOptIn && !form.phone) { setError('Add your phone number to get texts.'); return; }
     if (form.phone && form.phone.replace(/\D/g, '').length !== 10) { setError('Enter a 10-digit phone number, like (555) 000-0000.'); return; }
     setBusy(true);
     try { await onSignup({ ...form, code }); }
@@ -813,6 +814,10 @@ const SignupPage = ({ go, code, onSignup }) => {
         </div>
         <Field label="Password" icon={Lock} type="password" autoComplete="new-password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
         <Field label="Confirm password" icon={Lock} type="password" autoComplete="new-password" placeholder="Type it again" value={form.confirm} onChange={(e) => up('confirm', e.target.value)} error={form.confirm && form.confirm !== form.password ? "Passwords don't match" : undefined} />
+        <label className="flex items-start gap-3 text-sm cursor-pointer select-none">
+          <input type="checkbox" checked={form.smsOptIn} onChange={(e) => up('smsOptIn', e.target.checked)} className="mt-1 w-4 h-4 accent-[#3F7BE6]" />
+          <span>Text me updates about my rewards and weekly reminders. <span className="text-[var(--text-dim)]">Msg &amp; data rates may apply. Reply STOP to opt out.</span></span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
           <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} />
@@ -1259,6 +1264,22 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   };
   useEffect(() => { loadBoard(); }, [submissions.length]);
 
+  // latest announcement banner (dismissed ones stay hidden on this device)
+  const [news, setNews] = useState(null);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('announcements').select('*').eq('active', true).order('created_at', { ascending: false }).limit(1);
+      const a = data?.[0];
+      let seen = '';
+      try { seen = localStorage.getItem('mr_seen_announcement') || ''; } catch {}
+      if (a && a.id !== seen) setNews(a);
+    })().catch(() => {});
+  }, []);
+  const dismissNews = () => {
+    try { localStorage.setItem('mr_seen_announcement', news.id); } catch {}
+    setNews(null);
+  };
+
 
   // every reward in one swipeable row
   const prizes = [
@@ -1300,6 +1321,16 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
               <button onClick={() => { setOpenPrize(null); setView('drop'); }} className="stk-btn mt-5 w-full h-13 py-3.5 font-bold">Drop your videos</button>
             </div>
           </div>
+        </div>
+      )}
+      {news && (
+        <div className="gloss g-grape rounded-[24px] p-5 text-white flex items-start gap-4 pop-in" role="status">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold opacity-80">New from Mad Rewards</div>
+            <div className="font-arcade text-xl mt-0.5">{news.title}</div>
+            {news.body && <p className="text-sm mt-1 opacity-90 whitespace-pre-line">{news.body}</p>}
+          </div>
+          <button onClick={dismissNews} className="w-9 h-9 rounded-full bg-white/20 grid place-items-center flex-shrink-0" aria-label="Dismiss announcement"><X size={16} /></button>
         </div>
       )}
       <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -1876,6 +1907,7 @@ const App = () => {
         cashapp: form.cashapp || null,
         tiktok: form.tiktok || null,
         instagram: form.instagram || null,
+        smsOptIn: !!form.smsOptIn,
       }),
     });
     const data = await res.json();

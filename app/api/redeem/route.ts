@@ -71,6 +71,7 @@ export async function POST(req: Request) {
       cashapp: clean(body.cashapp) || null,
       tiktok_handle: clean(body.tiktok) || null,
       instagram_handle: clean(body.instagram) || null,
+      sms_opt_in: !!body.smsOptIn,
     }).select().maybeSingle()
     if (crow.error) {
       // roll back the auth user so they can retry cleanly

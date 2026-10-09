@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { todayLocal, weekStart, addDays, weekLabel } from '@/lib/rewards'
 import { sendEmail, emailConfigured, SITE_URL } from '@/lib/email'
+import { sendSms, smsConfigured } from '@/lib/sms'
 
 // Sunday reminder. Vercel Cron calls this every Sunday morning (see vercel.json).
 // Emails every creator who hasn't submitted any video for the week that just
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   const end = addDays(week, 6)
 
   const [creators, subs] = await Promise.all([
-    admin.from('creators').select('id, name, email'),
+    admin.from('creators').select('id, name, email, phone, sms_opt_in'),
     admin.from('video_submissions').select('creator_id').gte('posted_at', week).lte('posted_at', end + 'T23:59:59'),
   ])
   if (creators.error || subs.error) {
@@ -32,15 +33,18 @@ export async function GET(req: Request) {
   }
 
   const submitted = new Set((subs.data || []).map((s) => s.creator_id))
-  const missing = (creators.data || []).filter((c) => c.email && !submitted.has(c.id))
+  const missing = (creators.data || []).filter((c) => !submitted.has(c.id))
 
-  if (dry) return NextResponse.json({ week: weekLabel(week), wouldEmail: missing.map((c) => c.email) })
+  if (dry) return NextResponse.json({ week: weekLabel(week), wouldEmail: missing.filter((c) => c.email).map((c) => c.email), wouldText: missing.filter((c) => c.sms_opt_in && c.phone).length })
 
-  if (!emailConfigured()) {
-    return NextResponse.json({ error: 'RESEND_API_KEY / REMINDER_FROM not set' }, { status: 500 })
+  if (!emailConfigured() && !smsConfigured()) {
+    return NextResponse.json({ error: 'Neither email (Resend) nor texting (Twilio) is set up' }, { status: 500 })
   }
 
-  const results = await Promise.all(missing.map(async (c) => {
+  const texts = await Promise.all(missing.filter((c) => c.sms_opt_in && c.phone).map((c) =>
+    sendSms(c.phone, `Mad Rewards: last call. Submit this week's videos by tonight 11:59pm. ${SITE_URL}/#drop Reply STOP to opt out.`)))
+
+  const results = await Promise.all(missing.filter((c) => c.email).map(async (c) => {
     const first = (c.name || '').split(' ')[0] || 'there'
     const ok = await sendEmail(
       c.email,
@@ -54,5 +58,5 @@ export async function GET(req: Request) {
     return { email: c.email, ok }
   }))
 
-  return NextResponse.json({ week: weekLabel(week), sent: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok) })
+  return NextResponse.json({ week: weekLabel(week), texted: texts.filter(Boolean).length, sent: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok) })
 }
