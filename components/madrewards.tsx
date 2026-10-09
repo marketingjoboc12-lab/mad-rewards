@@ -591,14 +591,14 @@ const Reveal = ({
 // ============================================================================
 const REWARD_TEASERS = {
   week: [
-    { tag: '$25–$600', label: 'Cash for your views', sub: 'Every single week' },
-    { tag: '+$50', label: 'Posting bonus', sub: 'Show up every day' },
-    { tag: '+$10', label: 'Rep the logo', sub: 'Easy money' },
+    { tag: '$100', label: 'Per 100K views', sub: 'Paid every week' },
+    { tag: '+$10', label: 'Logo bonus', sub: 'Every week' },
+    { tag: 'Re-up', label: 'Free product', sub: '10 videos in 2 weeks' },
   ],
   month: [
-    { tag: 'iPhone', label: 'Brand new iPhone', sub: 'Monthly reach goal' },
-    { tag: 'Trip for 2', label: 'All on us', sub: 'For the crazy ones' },
-    { tag: '???', label: 'More drops soon', sub: 'Stay tuned' },
+    { tag: 'Merch', label: 'Socks, shirt + hat, duffle', sub: 'Unlocks with your views' },
+    { tag: 'iPhone', label: 'iPhone 18 Pro', sub: 'Monthly prize' },
+    { tag: 'Mexico', label: 'Trip for 2', sub: 'Monthly prize' },
   ],
 };
 
@@ -643,7 +643,7 @@ const LandingPage = ({ go, theme, setTheme }) => {
             <span className="hero-line hero-line-3 text-[var(--accent)]">Repeat.</span>
           </h1>
           <p className="anim-fade-up anim-d-400 mt-6 md:mt-8 mx-auto max-w-lg text-base md:text-xl text-[var(--text-dim)] leading-relaxed">
-            Post content. Hit goals. Earn rewards every week. Mad Rewards is invite-only.
+            Post content, get paid for your views every week. Invite-only.
           </p>
         </div>
       </header>
@@ -675,7 +675,7 @@ const LandingPage = ({ go, theme, setTheme }) => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           {REWARD_TEASERS.month.map((t, i) => <BlurReward key={i} t={t} />)}
         </div>
-        <p className="text-center text-sm text-[var(--text-dim)] mt-6 md:mt-8">Sign in to unlock the full reward ladder and track your progress.</p>
+        <p className="text-center text-sm text-[var(--text-dim)] mt-6 md:mt-8">Log in to see all rewards and track your progress.</p>
       </section>
 
       {/* TWO DOORS */}
@@ -689,8 +689,8 @@ const LandingPage = ({ go, theme, setTheme }) => {
           </Card>
           <Card interactive onClick={() => go('request')} className="p-6 md:p-7 text-center cursor-pointer">
             <div className="w-12 h-12 rounded-2xl bg-[var(--elev2)] text-[var(--accent)] flex items-center justify-center mx-auto mb-4"><Mail size={20} /></div>
-            <h3 className="font-display font-bold text-xl">Want in?</h3>
-            <p className="text-sm text-[var(--text-dim)] mt-2">Request an invite. If you're a fit, we'll send you a code.</p>
+            <h3 className="font-display font-bold text-xl">Don't have a code?</h3>
+            <p className="text-sm text-[var(--text-dim)] mt-2">Request an invite and we'll review it.</p>
             <div className="mt-5"><Btn variant="outline" className="w-full" iconRight={ArrowRight}>Request an invite</Btn></div>
           </Card>
         </div>
@@ -742,7 +742,7 @@ const LoginPage = ({ go, onLogin }) => {
     <AuthFrame go={go}>
       <div className="text-center mb-8">
         <h1 className="font-display font-extrabold text-4xl md:text-5xl tracking-tight">Welcome back.</h1>
-        <p className="mt-4 text-sm text-[var(--text-dim)]">Log in to see this week's challenge.</p>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">Log in to your account.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -841,7 +841,7 @@ const RequestPage = ({ go, onSubmit }) => {
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl bg-[var(--accent)] text-black flex items-center justify-center mx-auto mb-5"><Check size={26} strokeWidth={3} /></div>
         <h1 className="font-display font-extrabold text-4xl tracking-tight">Request sent.</h1>
-        <p className="mt-4 text-sm text-[var(--text-dim)]">If you're a fit, we'll send a one-time invite code to your email. Keep an eye out.</p>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">We'll review your request and email you an invite code if you're approved.</p>
         <div className="mt-7"><Btn variant="outline" onClick={() => go('landing')}>Back home</Btn></div>
       </div>
     </AuthFrame>
@@ -850,7 +850,7 @@ const RequestPage = ({ go, onSubmit }) => {
     <AuthFrame go={go}>
       <div className="text-center mb-8">
         <h1 className="font-display font-extrabold text-4xl tracking-tight">Request an invite.</h1>
-        <p className="mt-4 text-sm text-[var(--text-dim)]">Tell us about you. Mad Rewards is invite-only — we approve creators who fit.</p>
+        <p className="mt-4 text-sm text-[var(--text-dim)]">Mad Rewards is invite-only. Share a few details and we'll be in touch.</p>
       </div>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => up('name', e.target.value)} />
@@ -859,7 +859,7 @@ const RequestPage = ({ go, onSubmit }) => {
           <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
           <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} />
         </div>
-        <Textarea label="Your pitch" placeholder="Audience size, what you post, why you're a fit…" value={form.note} onChange={(e) => up('note', e.target.value)} />
+        <Textarea label="Anything else? (optional)" placeholder="Follower count, the kind of content you post" value={form.note} onChange={(e) => up('note', e.target.value)} />
         {error && <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-xl px-3.5 py-3">{error}</div>}
         <div className="pt-2"><Btn type="submit" size="lg" className="w-full" disabled={busy} iconRight={ArrowRight}>{busy ? 'Sending…' : 'Send request'}</Btn></div>
       </form>
@@ -1313,7 +1313,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
           <div className="min-w-0">
             <span className="inline-block rounded-full bg-white/25 px-3 py-1 text-xs font-bold">This week's level</span>
             <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none">{LEVELS[lvl].name}</div>
-            <div className="mt-4 text-sm font-semibold opacity-80">Your bag so far</div>
+            <div className="mt-4 text-sm font-semibold opacity-80">Earned this week</div>
             <div className="font-arcade text-6xl md:text-7xl leading-none tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
           </div>
           <div className="flex-shrink-0 -mr-2 -mt-2"><MEmblem size={128} /></div>
