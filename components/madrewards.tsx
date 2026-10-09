@@ -857,6 +857,7 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
   const [menuOpen, setMenuOpen] = useState(false);
   const tabs = [
     { k: 'dash',    label: 'Home',      icon: BarChart3 },
+    { k: 'drop',    label: 'Drop videos', icon: Upload },
     { k: 'history', label: 'My drops',  icon: Inbox },
     { k: 'rewards', label: 'How it works', icon: Trophy },
   ];
@@ -1186,7 +1187,7 @@ const DropCelebration = ({ data, onClose }) => (
       <Confetti />
       <div className="relative">
         <div className="text-6xl">{data.levelUp ? LEVELS[data.level].emoji : '🎉'}</div>
-        <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : 'Dropped!'}</h2>
+        <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : data.count > 1 ? `${data.count} videos dropped!` : 'Dropped!'}</h2>
         {data.levelUp && <p className="mt-1 font-semibold">You're now <b>{LEVELS[data.level].name}</b> {LEVELS[data.level].emoji}</p>}
         <div className="mt-5 inline-block rounded-full g-lime text-[#08210f] font-arcade text-2xl px-5 py-2 border-0">+{fmtCash(data.added)}</div>
         <p className="mt-3 text-sm text-[var(--text-dim)]">added to this week's bag (pending until we check Monday) 👀</p>
@@ -1212,7 +1213,6 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   const nextLvl = LEVELS[lvl + 1] || null;
   const lvlPct = nextLvl ? Math.round(((w.views - LEVELS[lvl].at) / (nextLvl.at - LEVELS[lvl].at)) * 100) : 100;
   const bag = useCountUp(w.pay);
-  const [party, setParty] = useState(null);
   const [board, setBoard] = useState(null);
   const examples = deal?.examples || [];
   const nf = (n) => Number(n || 0).toLocaleString();
@@ -1228,14 +1228,6 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   };
   useEffect(() => { loadBoard(); }, [submissions.length]);
 
-  const handleDrop = async (data) => {
-    await onSubmit(data);
-    const wk = weekStart(data.postedAt);
-    const after = computeWeek([...subs, { posted: data.postedAt, status: 'pending', views: 0, claimedViews: data.claimedViews }], wk, true);
-    const before = computeWeek(subs, wk, true);
-    const newLvl = levelFor(after.views);
-    setParty({ added: Math.max(0, after.pay - before.pay), level: newLvl, levelUp: newLvl > levelFor(before.views) });
-  };
 
   // every reward in one swipeable row
   const prizes = [
@@ -1250,8 +1242,6 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      {party && <DropCelebration data={party} onClose={() => setParty(null)} />}
-
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <h1 className="font-arcade text-3xl md:text-4xl leading-none">Welcome back, {user.name.split(' ')[0]}.</h1>
         <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'g-sun text-black border-transparent' : 'bg-[var(--card)]'}`}>
@@ -1293,7 +1283,10 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         <p className="mt-3 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
 
-      <a href="#drop" className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>📲</span><span>Drop a video</span></a>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button onClick={() => setView('drop')} className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>📲</span><span>Drop your videos</span></button>
+        <button onClick={() => setView('ideas')} className="flex items-center justify-center gap-2 h-16 rounded-full g-grape gloss text-white font-arcade text-lg shadow-[0_10px_24px_-10px_rgba(91,61,245,.7)]"><span>💡</span><span>Examples of videos that hit</span></button>
+      </div>
 
       {/* LEADERBOARD */}
       <section className="stk p-5 md:p-6" aria-label="Leaderboard">
@@ -1376,22 +1369,6 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         ))}
       </section>
 
-      <div id="drop" className="scroll-mt-24"><SubmitForm user={user} onSubmit={handleDrop} /></div>
-
-      {examples.length > 0 && (
-        <section aria-label="Example videos">
-          <h2 className="font-arcade text-xl mb-3">💡 Need ideas?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {examples.map((x, i) => (
-              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer" className="stk flex items-center justify-between gap-3 p-4">
-                <span className="flex items-center gap-3 min-w-0"><PlatformIcon platform={detectPlatform(x)} /><span className="text-sm truncate">{x}</span></span>
-                <ExternalLink size={15} className="flex-shrink-0" />
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
-
       <section aria-label="Recent videos">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-arcade text-xl">🎬 Your drops</h2>
@@ -1400,7 +1377,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         {mine.length === 0 ? (
           <div className="stk p-8 text-center">
             <div className="text-4xl">🎬</div>
-            <p className="mt-2 font-semibold">Nothing yet. Drop your first video above and start stacking.</p>
+            <p className="mt-2 font-semibold">Nothing yet. Hit "Drop your videos" above and start stacking.</p>
           </div>
         ) : (
           <div className="space-y-2.5">{mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} />)}</div>
@@ -1410,110 +1387,191 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   );
 };
 
-const SubmitForm = ({ user, onSubmit }) => {
-  const [url, setUrl] = useState('');
-  const [platform, setPlatform] = useState('tiktok');
-  const [postedAt, setPostedAt] = useState('');
-  const [claimedViews, setClaimedViews] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+// ────────────────────────── DROP PAGE (bulk upload) ──────────────────────────
+let rowSeq = 0;
+const blankRow = (date, key = `row-${++rowSeq}`) => ({ key, url: '', postedAt: date, views: '', error: '' });
+const inputCls = 'w-full h-12 px-4 rounded-2xl bg-[var(--elev2)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:ring-4 focus:ring-[var(--grape)]/25 transition-shadow';
 
+const DropPage = ({ submissions, onSubmit, setView }) => {
   const today = todayLocal();
   const minDate = earliestSubmittableDate(today);
-  const ready = url && postedAt && postedAt >= minDate && postedAt <= today && parseViews(claimedViews) > 0;
+  const [rows, setRows] = useState(() => [blankRow(today, 'start-1'), blankRow(today, 'start-2'), blankRow(today, 'start-3')]);
+  const [pasting, setPasting] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [party, setParty] = useState(null);
+  const [note, setNote] = useState('');
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!ready) return;
-    setError('');
-    setSuccess(false);
-    setSubmitting(true);
-    try {
-      await onSubmit({ creatorId: user.id, url, platform, postedAt, claimedViews: parseViews(claimedViews) });
-      setUrl(''); setPostedAt(''); setClaimedViews('');
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2400);
-    } catch (err) {
-      setError(err?.message || 'Could not submit your link. Try again.');
-    } finally {
-      setSubmitting(false);
+  const subs = submissions.map(toSubLike);
+  const set = (key, patch) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch, error: '' } : r)));
+  const filled = rows.filter((r) => r.url.trim() || r.views.trim());
+  const rowProblem = (r) => {
+    if (!r.url.trim()) return 'Add the video link.';
+    if (detectPlatform(r.url) === 'other') return 'Use a TikTok or Instagram link.';
+    if (!r.postedAt || r.postedAt < minDate || r.postedAt > today) return 'Pick a date from this week.';
+    if (!(parseViews(r.views) > 0)) return 'Add the views.';
+    return '';
+  };
+  const ready = filled.length > 0 && filled.every((r) => !rowProblem(r));
+  const addViews = filled.reduce((a, r) => a + (parseViews(r.views) || 0), 0);
+
+  // estimate what these drops add to each week's bag
+  const estimateAdded = (list) => {
+    const extra = list.map((r) => ({ posted: r.postedAt, status: 'pending', views: 0, claimedViews: parseViews(r.views) }));
+    const weeks = [...new Set(list.map((r) => weekStart(r.postedAt)))];
+    return weeks.reduce((a, wk) => a + computeWeek([...subs, ...extra], wk, true).pay - computeWeek(subs, wk, true).pay, 0);
+  };
+  const preview = ready ? estimateAdded(filled) : 0;
+
+  const addPasted = () => {
+    const links = pasted.split(/[\s,]+/).map((x) => x.trim()).filter((x) => /tiktok\.com|instagram\.com/i.test(x));
+    if (!links.length) { setNote('No TikTok or Instagram links found in what you pasted.'); return; }
+    const keep = rows.filter((r) => r.url.trim() || r.views.trim());
+    setRows([...keep, ...links.map((u) => ({ ...blankRow(today), url: u }))]);
+    setPasted(''); setPasting(false);
+    setNote(`Added ${links.length} link${links.length > 1 ? 's' : ''}. Now fill in the date and views for each.`);
+  };
+
+  const dropAll = async () => {
+    if (!ready || busy) return;
+    setBusy(true); setNote('');
+    const before = levelFor(computeWeek(subs, weekStart(today), true).views);
+    const done = [], failed = [];
+    for (const r of filled) {
+      try {
+        await onSubmit({ url: r.url.trim(), platform: detectPlatform(r.url), postedAt: r.postedAt, claimedViews: parseViews(r.views) });
+        done.push(r);
+      } catch (e) {
+        failed.push({ ...r, error: e?.message || 'Could not submit this one.' });
+      }
     }
+    setBusy(false);
+    setRows(failed.length ? failed : [blankRow(today)]);
+    if (done.length) {
+      const added = estimateAdded(done);
+      const after = levelFor(computeWeek([...subs, ...done.map((r) => ({ posted: r.postedAt, status: 'pending', views: 0, claimedViews: parseViews(r.views) }))], weekStart(today), true).views);
+      setParty({ added, count: done.length, level: after, levelUp: after > before });
+    }
+    if (failed.length) setNote(`${failed.length} video${failed.length > 1 ? 's' : ''} didn't go through. Check the red notes below.`);
   };
 
   return (
-    <div className="stk p-6 md:p-8">
-      <div className="mb-6">
-        <h2 className="font-arcade text-2xl"><span className="mr-2">📲</span>Drop a video</h2>
-        <p className="text-sm text-[var(--text-dim)] mt-1">One at a time: the link, the day you posted it, and its views right now.</p>
+    <div className="max-w-2xl mx-auto space-y-6">
+      {party && <DropCelebration data={party} onClose={() => { setParty(null); if (!rows.some((r) => r.error)) setView('dash'); }} />}
+
+      <div>
+        <button onClick={() => setView('dash')} className="text-sm font-bold text-[var(--text-dim)] hover:text-[var(--text)]">← Home</button>
+        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Drop your videos 📲</h1>
+        <p className="mt-2 text-[var(--text-dim)]">Add every video you posted this week, one row each, then drop them all at once. Due Saturday 11:59pm.</p>
       </div>
 
-      <form onSubmit={submit} className="space-y-6">
-        {/* platform toggle */}
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Platform</label>
-          <div className="grid grid-cols-2 gap-2">
-            {[{ id: 'tiktok', label: 'TikTok' }, { id: 'instagram', label: 'Instagram' }].map((p) => (
-              <button
-                type="button"
-                key={p.id}
-                onClick={() => setPlatform(p.id)}
-                className={`flex items-center justify-center gap-2 h-12 stk-chip font-bold text-sm transition-colors ${platform === p.id ? 'bg-[var(--lime)] text-black' : 'bg-[var(--elev1)] text-[var(--text-dim)]'}`}
-              >
-                <PlatformIcon platform={p.id} />{p.label}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setPasting((p) => !p)} className="pill-btn bg-[var(--elev2)]">📋 Paste a list of links</button>
+        <button onClick={() => setView('ideas')} className="pill-btn bg-[var(--elev2)]">💡 Need ideas?</button>
+      </div>
+
+      {pasting && (
+        <div className="stk p-5">
+          <label htmlFor="paste" className="font-bold">Paste your links</label>
+          <p className="text-xs text-[var(--text-dim)] mt-0.5">One per line or separated by spaces. We'll make a row for each.</p>
+          <textarea id="paste" value={pasted} onChange={(e) => setPasted(e.target.value)} rows={5} className={`${inputCls} h-auto py-3 mt-3 resize-y`} placeholder={'https://www.tiktok.com/@you/video/123\nhttps://www.instagram.com/reel/abc'} />
+          <button onClick={addPasted} className="stk-btn mt-3 h-12 px-5 font-bold">Add these links</button>
         </div>
+      )}
 
-        {/* url */}
-        <Field
-          label="Video URL"
-          icon={LinkIcon}
-          placeholder={platform === 'instagram' ? 'https://www.instagram.com/reel/...' : 'https://www.tiktok.com/@you/video/...'}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
+      {note && <p className="text-sm font-semibold" role="status">{note}</p>}
 
-        {/* date + views */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Date posted</label>
-            <input
-              type="date"
-              min={minDate}
-              max={today}
-              value={postedAt}
-              onChange={(e) => setPostedAt(e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Views on this video</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              placeholder="e.g. 48200, 400k, 1.2m"
-              value={claimedViews}
-              onChange={(e) => setClaimedViews(e.target.value)}
-              className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
-            />
-            {claimedViews && parseViews(claimedViews) > 0 && (
-              <p className="text-[11px] text-[var(--accent)] mt-1.5 font-semibold">= {parseViews(claimedViews).toLocaleString()} views</p>
+      <div className="space-y-3">
+        {rows.map((r, i) => (
+          <div key={r.key} className={`stk p-4 md:p-5 ${r.error ? 'ring-2 ring-[var(--danger)]' : ''}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-arcade text-lg flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl g-grape text-white grid place-items-center text-sm">{i + 1}</span>
+                {r.url && detectPlatform(r.url) !== 'other' ? <PlatformIcon platform={detectPlatform(r.url)} size={16} /> : null}
+              </span>
+              {rows.length > 1 && (
+                <button onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-sm font-bold text-[var(--text-dim)] hover:text-[var(--danger)]" aria-label={`Remove video ${i + 1}`}>Remove ✕</button>
+              )}
+            </div>
+            <label className="sr-only" htmlFor={`url-${r.key}`}>Video link</label>
+            <input id={`url-${r.key}`} value={r.url} onChange={(e) => set(r.key, { url: e.target.value })} placeholder="TikTok or Instagram link" inputMode="url" className={inputCls} />
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label htmlFor={`date-${r.key}`} className="block text-xs font-bold text-[var(--text-dim)] mb-1.5">Date posted</label>
+                <input id={`date-${r.key}`} type="date" min={minDate} max={today} value={r.postedAt} onChange={(e) => set(r.key, { postedAt: e.target.value })} className={inputCls} />
+              </div>
+              <div>
+                <label htmlFor={`views-${r.key}`} className="block text-xs font-bold text-[var(--text-dim)] mb-1.5">Views right now</label>
+                <input id={`views-${r.key}`} value={r.views} onChange={(e) => set(r.key, { views: e.target.value })} placeholder="48200, 400k, 1.2m" inputMode="decimal" className={inputCls} />
+              </div>
+            </div>
+            {(r.error || ((r.url || r.views) && rowProblem(r))) && (
+              <p className="text-xs font-semibold text-[var(--danger)] mt-2">{r.error || rowProblem(r)}</p>
             )}
-            <p className="text-[11px] text-[var(--text-faint)] mt-2 leading-snug">
-              All data is verified. Submitting false info means losing access to the program.
-            </p>
           </div>
-        </div>
+        ))}
+      </div>
 
+      <button onClick={() => setRows((rs) => [...rs, blankRow(rs[rs.length - 1]?.postedAt || today)])} className="w-full h-14 rounded-[24px] border-2 border-dashed border-[var(--grape)]/50 font-bold text-[var(--grape)] hover:bg-[var(--grape)]/5">
+        + Add another video
+      </button>
 
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
-          {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
-          
-          <button type="submit" disabled={!ready || submitting} className="stk-btn h-14 px-6 w-full sm:w-auto font-arcade text-lg disabled:opacity-40 disabled:pointer-events-none">{submitting ? 'Dropping…' : 'Drop it 🚀'}</button>
+      <div className="stk p-5 sticky bottom-4 z-20">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm">
+            <b>{filled.length} video{filled.length === 1 ? '' : 's'}</b> · {Number(addViews).toLocaleString()} views
+            {ready && preview > 0 && <span className="text-[var(--text-dim)]"> · ≈ +{fmtCash(preview)}</span>}
+          </div>
+          <button onClick={dropAll} disabled={!ready || busy} className="stk-btn h-14 px-7 font-arcade text-lg w-full sm:w-auto disabled:opacity-40 disabled:pointer-events-none">
+            {busy ? 'Dropping…' : `Drop ${filled.length > 1 ? 'them all' : 'it'} 🚀`}
+          </button>
         </div>
-      </form>
+        <p className="text-[11px] text-[var(--text-faint)] mt-2">All data is verified. Submitting false info means losing access to the program.</p>
+      </div>
+    </div>
+  );
+};
+
+// ────────────────────────── IDEAS PAGE ──────────────────────────
+const IdeasPage = ({ deal, setView }) => {
+  const examples = deal?.examples || [];
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <button onClick={() => setView('dash')} className="text-sm font-bold text-[var(--text-dim)] hover:text-[var(--text)]">← Home</button>
+        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Videos that hit 💡</h1>
+        <p className="mt-2 text-[var(--text-dim)]">Out of ideas? Recreate one of these in your own style. Keep MAD LABS clearly visible.</p>
+      </div>
+      {examples.length === 0 ? (
+        <div className="stk p-8 text-center">
+          <div className="text-4xl">🎬</div>
+          <p className="mt-2 font-semibold">Examples are coming soon. Check back in a bit.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {examples.map((x, i) => (
+            <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer" className="stk flex items-center gap-4 p-4 hover:-translate-y-0.5 transition-transform">
+              <span className={`w-12 h-12 rounded-2xl grid place-items-center text-white flex-shrink-0 ${i % 3 === 0 ? 'g-grape' : i % 3 === 1 ? 'g-gum' : 'g-sky'}`}><PlatformIcon platform={detectPlatform(x)} size={18} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">Example {i + 1}</span>
+                <span className="block text-xs text-[var(--text-dim)] truncate">{x}</span>
+              </span>
+              <span className="pill-btn g-lime text-[#08210f]">Watch ↗</span>
+            </a>
+          ))}
+        </div>
+      )}
+      <div className="stk p-5">
+        <h2 className="font-arcade text-xl mb-3">🎬 Styles that work</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {VIDEO_STYLES.map((v) => (
+            <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)]">
+              <div className="font-semibold text-sm">{v.e} {v.t}</div>
+              <div className="text-xs text-[var(--text-dim)] mt-0.5">{v.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1764,6 +1822,8 @@ const App = () => {
     body = (
       <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
         {view === 'dash'    && <CreatorDashboard user={user} deal={deal} submissions={submissions} payouts={payouts} onSubmit={handleNewSubmission} setView={setView} />}
+        {view === 'drop'    && <DropPage submissions={submissions} onSubmit={handleNewSubmission} setView={setView} />}
+        {view === 'ideas'   && <IdeasPage deal={deal} setView={setView} />}
         {view === 'rewards' && <CreatorRewards />}
         {view === 'history' && <CreatorHistory submissions={submissions} />}
         {!user.rulesAccepted && <RulesGate user={user} onAccept={acceptRules} />}
