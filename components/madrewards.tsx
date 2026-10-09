@@ -1076,12 +1076,13 @@ const RulesContent = () => (
       </div>
 
       <ul className="space-y-2">
+        <li><b>This site stays private.</b> No screenshots, screen recordings or sharing anything from here. Every page is marked with your name.</li>
+        <li><b>Don't mention the program.</b> Never say you're part of Mad Rewards, talk about payouts, or say how you got the product, in any video, caption, comment or story.</li>
         <li><b>Videos must still be up when we check Monday.</b> TikTok and Instagram often remove cannabis content. Removed videos don't count.</li>
         <li><b>Report real views.</b> We verify every number. False numbers end your spot in the program.</li>
         <li><b>One link, one submission.</b> Each video counts once.</li>
         <li><b>Late videos don't count.</b> Anything not submitted by Sunday 11:59pm misses that week.</li>
-        <li><b>This site stays private.</b> No screenshots, screen recordings or sharing anything from here. Every page is marked with your name.</li>
-        <li><b>Don't mention the program.</b> Never say you're part of Mad Rewards, talk about payouts, or say how you got the product, in any video, caption, comment or story.</li>
+        <li><b>Breaking the rules gets you removed.</b> If we find you broke any of these rules, or you don't post any content, you'll be disqualified and taken out of the program.</li>
       </ul>
     </Sec>
   </div>
