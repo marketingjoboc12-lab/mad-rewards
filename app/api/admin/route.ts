@@ -158,19 +158,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
-  // ---- delete a creator: their videos, payouts, profile, and login ----
+  // ---- delete creators (one or many): their videos, payouts, profile, and login ----
   if (body.action === 'creator_delete') {
-    const id = body.id
-    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : []
+    if (!ids.length) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     for (const t of ['payouts', 'video_submissions']) {
-      const r = await admin.from(t).delete().eq('creator_id', id)
+      const r = await admin.from(t).delete().in('creator_id', ids)
       if (r.error) return NextResponse.json({ error: r.error.message }, { status: 500 })
     }
-    const c = await admin.from('creators').delete().eq('id', id)
+    const c = await admin.from('creators').delete().in('id', ids)
     if (c.error) return NextResponse.json({ error: c.error.message }, { status: 500 })
-    const u = await admin.auth.admin.deleteUser(id)
-    if (u.error && !/not found/i.test(u.error.message)) return NextResponse.json({ error: u.error.message }, { status: 500 })
-    return NextResponse.json({ ok: true })
+    for (const id of ids) {
+      const u = await admin.auth.admin.deleteUser(id)
+      if (u.error && !/not found/i.test(u.error.message)) return NextResponse.json({ error: u.error.message }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, deleted: ids.length })
   }
 
   // ---- delete one video submission ----

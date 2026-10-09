@@ -96,6 +96,9 @@ export default function AdminPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests'>('overview')
   const [copied, setCopied] = useState('')
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
+  const [ask, setAsk] = useState<{ title: string; body: string; onYes: () => Promise<void> } | null>(null)
+  const [asking, setAsking] = useState(false)
   const [openSubs, setOpenSubs] = useState<Record<string, boolean>>({})
 
   const call = async (payload: object) => {
@@ -155,19 +158,32 @@ export default function AdminPage() {
     try { await call({ action: 'unmark_paid', id }); await load() } catch (err: any) { setError(err.message) }
   }
 
-  // ----- deletes -----
-  const deleteCreator = async (c: Creator) => {
-    const typed = prompt(`Delete ${c.name} (${c.email})?\n\nThis removes their login, all their videos and payout history. It can't be undone.\n\nType DELETE to confirm:`)
-    if (typed !== 'DELETE') return
-    setError('')
-    try { await call({ action: 'creator_delete', id: c.id }); await load() } catch (err: any) { setError(err.message) }
+  // ----- deletes (confirmed with the Yes/No box) -----
+  const deleteCreators = (list: Creator[]) => {
+    if (!list.length) return
+    setAsk({
+      title: list.length === 1 ? `Delete ${list[0].name}?` : `Delete ${list.length} creators?`,
+      body: "This removes their login, videos and payout history. It can't be undone.",
+      onYes: async () => {
+        setError('')
+        try { await call({ action: 'creator_delete', ids: list.map((c) => c.id) }); setPicked({}); await load() }
+        catch (err: any) { setError(err.message) }
+      },
+    })
   }
-  const deleteSubmission = async (s: Submission) => {
-    if (s.status === 'paid') { alert('This video is already paid. Undo the payment in Weekly pay first.'); return }
-    if (!confirm(`Delete this video submission?\n\n${s.video_url}`)) return
-    setError('')
-    try { await call({ action: 'submission_delete', id: s.id }); await load() } catch (err: any) { setError(err.message) }
+  const deleteSubmission = (s: Submission) => {
+    if (s.status === 'paid') { setError('This video is already paid. Undo the payment in Weekly pay first.'); return }
+    setAsk({
+      title: 'Delete this video?',
+      body: s.video_url,
+      onYes: async () => {
+        setError('')
+        try { await call({ action: 'submission_delete', id: s.id }); await load() } catch (err: any) { setError(err.message) }
+      },
+    })
   }
+  const pickedCreators = creators.filter((c) => picked[c.id])
+  const allPicked = creators.length > 0 && pickedCreators.length === creators.length
 
   // ----- campaign editing (title + example videos; reward numbers live in lib/rewards.ts) -----
   const newCampaign = () => { setEditing({
@@ -627,11 +643,24 @@ export default function AdminPage() {
         {/* ===== CREATORS ===== */}
         {tab === 'creators' && (
           <div className="card table-scroll">
+            {pickedCreators.length > 0 && (
+              <div className="bulkbar">
+                <span><b>{pickedCreators.length}</b> selected</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-ghost sm" onClick={() => setPicked({})}>Clear</button>
+                  <button className="btn btn-danger sm" onClick={() => deleteCreators(pickedCreators)}>Delete selected ({pickedCreators.length})</button>
+                </div>
+              </div>
+            )}
             <table className="tbl">
-              <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Cash App</th><th>TikTok</th><th>Instagram</th><th>Joined</th><th></th></tr></thead>
+              <thead><tr>
+                <th style={{ width: 36 }}><input type="checkbox" className="chk" aria-label="Select all creators" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? Object.fromEntries(creators.map((c) => [c.id, true])) : {})} /></th>
+                <th>Name</th><th>Email</th><th>Phone</th><th>Cash App</th><th>TikTok</th><th>Instagram</th><th>Joined</th><th></th>
+              </tr></thead>
               <tbody>
                 {creators.map((c) => (
-                  <tr key={c.id}>
+                  <tr key={c.id} className={picked[c.id] ? 'row-picked' : ''}>
+                    <td><input type="checkbox" className="chk" aria-label={`Select ${c.name}`} checked={!!picked[c.id]} onChange={(e) => setPicked((p) => ({ ...p, [c.id]: e.target.checked }))} /></td>
                     <td style={{ fontWeight: 600 }}>{c.name}</td>
                     <td className="muted">{c.email}</td>
                     <td>{c.phone || '—'}</td>
@@ -639,10 +668,10 @@ export default function AdminPage() {
                     <td>{c.tiktok_handle || '—'}</td>
                     <td>{c.instagram_handle || '—'}</td>
                     <td className="muted">{fmtDate(c.created_at)}</td>
-                    <td><button className="btn btn-ghost danger sm" onClick={() => deleteCreator(c)}>Delete</button></td>
+                    <td><button className="btn btn-ghost danger sm" onClick={() => deleteCreators([c])}>Delete</button></td>
                   </tr>
                 ))}
-                {creators.length === 0 && <tr><td className="empty" colSpan={8}>No creators yet.</td></tr>}
+                {creators.length === 0 && <tr><td className="empty" colSpan={9}>No creators yet.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -794,11 +823,32 @@ export default function AdminPage() {
           </>
         )}
       </main>
+
+      {ask && (
+        <div className="modal-bg" onClick={() => !asking && setAsk(null)}>
+          <div className="card modal" role="dialog" aria-modal="true" aria-label={ask.title} onClick={(e) => e.stopPropagation()}>
+            <div className="card-h">{ask.title}</div>
+            <p className="muted" style={{ marginTop: 8, wordBreak: 'break-word' }}>{ask.body}</p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" disabled={asking} onClick={() => setAsk(null)} autoFocus>No</button>
+              <button className="btn btn-danger" disabled={asking} onClick={async () => { setAsking(true); await ask.onYes(); setAsking(false); setAsk(null) }}>
+                {asking ? 'Deleting…' : 'Yes, delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 const CSS = `
+.bulkbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--accent-soft)}
+.row-picked td{background:var(--accent-soft)}
+.btn-danger{background:#ef4444;color:#fff;border:1px solid #ef4444}
+.btn-danger:hover{background:#dc2626}
+.modal-bg{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{width:400px;max-width:100%;padding:24px}
 .rules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;margin-top:18px}
 .rule-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
 .rule-row span{color:var(--dim)}
