@@ -42,7 +42,8 @@ export const REUP_ANCHOR = '2026-10-04'
 // Free merch, unlocked once by TOTAL verified views since joining.
 export const MILESTONES: Milestone[] = [
   { views: 100_000, label: 'Mad Labs socks', emoji: '🧦', image: '/rewards/socks.jpg' },
-  { views: 250_000, label: 'Mad Labs shirt', emoji: '👕', image: '/rewards/shirt.jpg' },
+  { views: 250_000, label: 'Mad Labs shirt + hat', emoji: '👕', image: '/rewards/shirt-hat.jpg' },
+  { views: 350_000, label: 'Mad Labs duffle bag', emoji: '👜', image: '/rewards/duffle.jpg' },
 ]
 
 // Big monthly prizes (calendar month) — highest one only.

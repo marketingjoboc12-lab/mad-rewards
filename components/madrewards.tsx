@@ -1275,9 +1275,9 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       {openPrize && (
         <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => setOpenPrize(null)}>
           <div className="stk w-full sm:max-w-md overflow-hidden rounded-b-none sm:rounded-[28px] pop-in" role="dialog" aria-modal="true" aria-label={openPrize.label} onClick={(e) => e.stopPropagation()}>
-            <div className={`relative ${openPrize.grad} aspect-[4/3]`}>
+            <div className={`relative ${openPrize.kind === 'Free merch' ? 'bg-[#F0EAE4] aspect-square' : 'bg-black aspect-[16/10]'}`}>
               {openPrize.image
-                ? <img src={openPrize.image} alt={openPrize.label} className="absolute inset-0 w-full h-full object-cover" />
+                ? <img src={openPrize.image} alt={openPrize.label} className={`absolute inset-0 w-full h-full ${openPrize.kind === 'Free merch' ? 'object-contain' : 'object-cover'}`} />
                 : <span className="absolute inset-0 grid place-items-center text-7xl" aria-hidden>{openPrize.emoji}</span>}
               <button onClick={() => setOpenPrize(null)} className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/45 text-white grid place-items-center" aria-label="Close"><X size={18} /></button>
             </div>
@@ -1392,24 +1392,43 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       {/* REWARDS ROW */}
       <section aria-label="Rewards">
         <h2 className="font-arcade text-xl mb-1">Rewards to unlock</h2>
-        <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash. Free merch unlocks with your total views, big prizes with one month's views.</p>
-        <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pt-1 pb-4 snap-x">
-          {prizes.map((p) => (
-            <button key={p.key} onClick={() => setOpenPrize(p)} className="prize-card snap-start flex-shrink-0 w-[190px] md:w-[200px] text-left rounded-[26px] overflow-hidden bg-[var(--card)] border border-[var(--card-line)]">
-              <div className={`relative ${p.grad} aspect-[4/5]`}>
-                {p.image
-                  ? <img src={p.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-                  : <span className="absolute inset-0 grid place-items-center text-6xl" aria-hidden>{p.emoji}</span>}
-                <span className="absolute top-2.5 left-2.5 rounded-full bg-black/45 backdrop-blur px-2.5 py-1 text-[11px] font-bold text-white">{p.kind}</span>
+        <p className="text-sm text-[var(--text-dim)]">Extras on top of your weekly cash. Tap any reward for details.</p>
+        <h3 className="font-bold mt-5 mb-2.5">Free merch <span className="font-normal text-[var(--text-dim)]">· your total views · {nf(life)} so far</span></h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+          {prizes.filter((p) => p.kind === 'Free merch').map((p) => (
+            <button key={p.key} onClick={() => setOpenPrize(p)} className="prize-card text-left rounded-[24px] overflow-hidden bg-[var(--card)] border border-[var(--card-line)]">
+              <div className="relative aspect-[4/5] bg-[#F0EAE4]">
+                <img src={p.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-contain" />
                 {p.got && <span className="absolute top-2.5 right-2.5 rounded-full ok-pill px-2.5 py-1 text-[11px] font-bold">Unlocked</span>}
               </div>
               <div className="p-3.5">
-                <div className="font-bold leading-tight">{p.label}</div>
-                <div className="text-xs text-[var(--text-dim)] mt-1">{p.got ? 'You earned this' : p.need}</div>
+                <div className="font-bold leading-tight text-sm">{p.label}</div>
+                <div className="text-xs text-[var(--text-dim)] mt-0.5">{p.got ? 'You earned this' : p.need}</div>
                 <div className="mt-2.5 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
                   <div className="h-full rounded-full g-blue grow-bar" style={{ width: `${Math.max(p.pct, 3)}%` }} />
                 </div>
-                <div className="text-[11px] font-bold mt-1.5 text-[var(--text-dim)]">{p.pct}%</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <h3 className="font-bold mt-7 mb-2.5">Monthly prizes <span className="font-normal text-[var(--text-dim)]">· one month's views · {nf(m.views)} in {monthLabel(monthStart(today)).split(' ')[0]}</span></h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {prizes.filter((p) => p.kind === 'Monthly prize').map((p) => (
+            <button key={p.key} onClick={() => setOpenPrize(p)} className="prize-card text-left rounded-[24px] overflow-hidden bg-[var(--card)] border border-[var(--card-line)]">
+              <div className="relative aspect-[16/10] bg-black">
+                <img src={p.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                {p.got && <span className="absolute top-2.5 right-2.5 rounded-full ok-pill px-2.5 py-1 text-[11px] font-bold">Won</span>}
+              </div>
+              <div className="p-4 flex items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold leading-tight">{p.label}</div>
+                  <div className="text-xs text-[var(--text-dim)] mt-0.5">{p.got ? 'You won this month' : p.need}</div>
+                  <div className="mt-2.5 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
+                    <div className="h-full rounded-full g-blue grow-bar" style={{ width: `${Math.max(p.pct, 3)}%` }} />
+                  </div>
+                </div>
+                <div className="font-arcade text-xl">{p.pct}%</div>
               </div>
             </button>
           ))}
