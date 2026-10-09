@@ -228,7 +228,15 @@ export default function AdminPage() {
   }
   const approveReq = async (id: string) => {
     setError('')
-    try { const r = await call({ action: 'request_approve', id }); await load(); if (r.code) { copy(r.code); alert(`Approved. Invite code copied:\n\n${r.code}\n\nSend it to them directly.`) } }
+    try {
+      const r = await call({ action: 'request_approve', id }); await load()
+      if (r.code) {
+        copy(r.code)
+        alert(r.emailed
+          ? `Approved. We emailed ${r.email} an invite link.\n\nCode (also copied): ${r.code}`
+          : `Approved. Invite code copied:\n\n${r.code}\n\nEmail isn't set up yet, so send it to them yourself.`)
+      }
+    }
     catch (err: any) { setError(err.message) }
   }
   const declineReq = async (id: string) => {

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { todayLocal, weekStart, addDays, weekLabel } from '@/lib/rewards'
+import { sendEmail, emailConfigured, SITE_URL } from '@/lib/email'
 
 // Sunday reminder. Vercel Cron calls this every Sunday morning (see vercel.json).
 // Emails every creator who hasn't submitted any video for the week that just
@@ -35,28 +36,22 @@ export async function GET(req: Request) {
 
   if (dry) return NextResponse.json({ week: weekLabel(week), wouldEmail: missing.map((c) => c.email) })
 
-  if (!process.env.RESEND_API_KEY || !process.env.REMINDER_FROM) {
+  if (!emailConfigured()) {
     return NextResponse.json({ error: 'RESEND_API_KEY / REMINDER_FROM not set' }, { status: 500 })
   }
 
   const results = await Promise.all(missing.map(async (c) => {
-    const first = (c.name || '').split(' ')[0] || 'hey'
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: process.env.REMINDER_FROM,
-        to: c.email,
-        subject: '⏰ Last call — submit your Mad Labs videos tonight',
-        html: `
-          <p>Yo ${first} 👋</p>
-          <p>We didn't get any videos from you for <b>${weekLabel(week)}</b>.</p>
-          <p>You've got until <b>tonight at 11:59pm</b> to drop your links + views — after that this week's rewards are locked. 🔒</p>
-          <p><a href="https://madrewards.xyz">Submit now → madrewards.xyz</a></p>
-          <p>— Mad Rewards</p>`,
-      }),
-    })
-    return { email: c.email, ok: res.ok }
+    const first = (c.name || '').split(' ')[0] || 'there'
+    const ok = await sendEmail(
+      c.email,
+      'Last call: submit your Mad Labs videos tonight',
+      `<p>Hi ${first.replace(/[<>&]/g, '')},</p>
+       <p>We didn't get any videos from you for <b>${weekLabel(week)}</b>.</p>
+       <p>You have until <b>tonight at 11:59pm</b> to submit your links and views. After that, this week's rewards are locked.</p>
+       <p><a href="${SITE_URL}/#drop">Submit now</a></p>
+       <p>Mad Rewards</p>`,
+    )
+    return { email: c.email, ok }
   }))
 
   return NextResponse.json({ week: weekLabel(week), sent: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok) })

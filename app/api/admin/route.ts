@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { createHmac, timingSafeEqual } from 'crypto'
+import { sendEmail, SITE_URL } from '@/lib/email'
 
 // Server-only. Service key never reaches the browser; it bypasses RLS for admin edits.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -265,7 +266,22 @@ export async function POST(req: Request) {
       .update({ status: 'approved', invite_code: code })
       .eq('id', body.id)
 
-    return NextResponse.json({ ok: true, code })
+    // Email them a link that opens sign-up with the code filled in.
+    const link = `${SITE_URL}/?invite=${encodeURIComponent(code)}`
+    const first = String(reqRow.data.name || '').trim().split(/\s+/)[0] || 'there'
+    const emailed = reqRow.data.email
+      ? await sendEmail(
+          reqRow.data.email,
+          "You're invited to Mad Rewards",
+          `<p>Hi ${first.replace(/[<>&]/g, '')},</p>
+           <p>Your request was approved. Use the link below to create your account:</p>
+           <p><a href="${link}">${link}</a></p>
+           <p>Your one-time invite code is <b>${code}</b>. Please don't share it.</p>
+           <p>Mad Rewards</p>`,
+        )
+      : false
+
+    return NextResponse.json({ ok: true, code, emailed, email: reqRow.data.email })
   }
 
   // ---- decline a signup request ----

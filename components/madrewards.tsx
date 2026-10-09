@@ -755,8 +755,8 @@ const LoginPage = ({ go, onLogin }) => {
   );
 };
 
-const InvitePage = ({ go, onValid }) => {
-  const [code, setCode] = useState('');
+const InvitePage = ({ go, onValid, initialCode = '' }) => {
+  const [code, setCode] = useState(initialCode);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
@@ -1777,6 +1777,7 @@ const App = () => {
   }, []);
   const [theme, setTheme] = useState('light');
   const [inviteCode, setInviteCode] = useState('');
+  const [linkCode, setLinkCode] = useState(''); // code from an emailed invite link
 
   const [submissions, setSubmissions] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -1824,7 +1825,13 @@ const App = () => {
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (data?.session?.user) await enterAs(data.session.user, true);
+        const inviteParam = new URLSearchParams(window.location.search).get('invite');
+        if (inviteParam && !data?.session?.user) {
+          // came from the invite email: open sign-up with the code filled in
+          setLinkCode(inviteParam.trim().toUpperCase());
+          window.history.replaceState(null, '', `${window.location.pathname}#invite`);
+          setViewRaw('invite');
+        } else if (data?.session?.user) await enterAs(data.session.user, true);
         else if (PUBLIC_VIEWS.includes(hashView())) setViewRaw(hashView());
       } catch (e) {
         console.error('[madrewards] session restore failed:', friendlyError(e));
@@ -1932,7 +1939,7 @@ const App = () => {
   } else if (view === 'login') {
     body = <LoginPage go={go} onLogin={handleLogin} />;
   } else if (view === 'invite') {
-    body = <InvitePage go={go} onValid={async (code) => { await checkInvite(code); setInviteCode(code); setView('signup'); }} />;
+    body = <InvitePage go={go} initialCode={linkCode} onValid={async (code) => { await checkInvite(code); setInviteCode(code); setView('signup'); }} />;
   } else if (view === 'signup') {
     body = inviteCode
       ? <SignupPage go={go} code={inviteCode} onSignup={handleSignup} />
