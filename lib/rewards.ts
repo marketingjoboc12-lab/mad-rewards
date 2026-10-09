@@ -10,8 +10,8 @@
 //  morning; Sunday is a grace day. Employee verifies Monday.
 // ============================================================
 
-export type Milestone = { views: number; label: string; emoji: string }
-export type MonthlyPrize = { views: number; label: string; emoji: string }
+export type Milestone = { views: number; label: string; emoji: string; image?: string }
+export type MonthlyPrize = { views: number; label: string; emoji: string; image?: string }
 
 // Weekly pay: flat $100 for every 100K views (views from all that week's videos add up).
 export const PAY_PER_100K = 100
@@ -41,14 +41,14 @@ export const REUP_ANCHOR = '2026-10-04'
 
 // Free merch, unlocked once by TOTAL verified views since joining.
 export const MILESTONES: Milestone[] = [
-  { views: 100_000, label: 'Mad Labs socks', emoji: '🧦' },
-  { views: 250_000, label: 'Mad Labs shirt', emoji: '👕' },
+  { views: 100_000, label: 'Mad Labs socks', emoji: '🧦', image: '/rewards/socks.jpg' },
+  { views: 250_000, label: 'Mad Labs shirt', emoji: '👕', image: '/rewards/shirt.jpg' },
 ]
 
 // Big monthly prizes (calendar month) — highest one only.
 export const MONTHLY_PRIZES: MonthlyPrize[] = [
-  { views: 3_000_000, label: 'iPhone 18 Pro Max', emoji: '📱' },
-  { views: 10_000_000, label: 'Trip for 2 — New York or Mexico', emoji: '✈️' },
+  { views: 3_000_000, label: 'iPhone 18 Pro', emoji: '📱', image: '/rewards/iphone.jpg' },
+  { views: 10_000_000, label: 'Trip for 2 to Mexico', emoji: '✈️', image: '/rewards/mexico.jpg' },
 ]
 
 // All dates are judged in this time zone (the deadline is 11:59pm here).

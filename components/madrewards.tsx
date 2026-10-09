@@ -1247,18 +1247,18 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
     try {
       const { data } = await supabase.auth.getSession();
       const token = data?.session?.access_token;
-      if (!token) return;
+      if (!token) { setBoard([]); return; }
       const res = await fetch('/api/leaderboard', { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setBoard((await res.json()).rows || []);
-    } catch {}
+      setBoard(res.ok ? (await res.json()).rows || [] : []);
+    } catch { setBoard([]); }
   };
   useEffect(() => { loadBoard(); }, [submissions.length]);
 
 
   // every reward in one swipeable row
   const prizes = [
-    ...MILESTONES.map((ms, i) => ({ key: 'm' + i, emoji: ms.emoji, label: ms.label, need: `${fmtViews(ms.views)} total`, got: life >= ms.views, toGo: ms.views - life, grad: i === 0 ? 'g-sky' : 'g-sun' })),
-    ...MONTHLY_PRIZES.map((p, i) => ({ key: 'p' + i, emoji: p.emoji, label: p.label, need: `${fmtViews(p.views)} this month`, got: m.views >= p.views, toGo: p.views - m.views, grad: i === 0 ? 'g-grape' : 'g-gum' })),
+    ...MILESTONES.map((ms, i) => ({ key: 'm' + i, emoji: ms.emoji, image: ms.image, label: ms.label, need: `${fmtViews(ms.views)} total`, got: life >= ms.views, toGo: ms.views - life, grad: i === 0 ? 'g-sky' : 'g-sun' })),
+    ...MONTHLY_PRIZES.map((p, i) => ({ key: 'p' + i, emoji: p.emoji, image: p.image, label: p.label, need: `${fmtViews(p.views)} this month`, got: m.views >= p.views, toGo: p.views - m.views, grad: i === 0 ? 'g-grape' : 'g-gum' })),
   ];
   const top3 = (board || []).slice(0, 3);
   const rest = (board || []).slice(3);
@@ -1363,9 +1363,11 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash. Free merch unlocks with your total views, big prizes with one month's views.</p>
         <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pb-2 snap-x">
           {prizes.map((p) => (
-            <div key={p.key} className="snap-start flex-shrink-0 w-[150px] text-center">
-              <div className={`gloss ${p.grad} rounded-[26px] h-[132px] grid place-items-center text-6xl shadow-[0_14px_28px_-14px_rgba(0,0,0,.45)] ${p.got ? '' : 'saturate-[.85]'}`}>
-                <span aria-hidden>{p.emoji}</span>
+            <div key={p.key} className="snap-start flex-shrink-0 w-[160px] text-center">
+              <div className={`relative overflow-hidden ${p.grad} rounded-[26px] h-[150px] grid place-items-center text-6xl shadow-[0_14px_28px_-14px_rgba(0,0,0,.45)]`}>
+                {p.image
+                  ? <img src={p.image} alt={p.label} loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${p.got ? '' : 'saturate-[.9]'}`} />
+                  : <span aria-hidden>{p.emoji}</span>}
               </div>
               <div className="font-bold mt-2 leading-tight text-sm">{p.label}</div>
               <div className="mt-1.5">
