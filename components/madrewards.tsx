@@ -1507,9 +1507,6 @@ const SubmitForm = ({ user, onSubmit }) => {
           </div>
         </div>
 
-        <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-          🚫 Your video has to <b className="text-[var(--text)]">still be up when we check on Monday</b> — TikTok & IG take down cannabis content a lot, and removed videos don't count. 🏷️ MAD LABS must be clearly visible.
-        </p>
 
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
           {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
