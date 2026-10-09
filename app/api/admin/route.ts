@@ -118,6 +118,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
+  // ---- delete a creator: their videos, payouts, profile, and login ----
+  if (body.action === 'creator_delete') {
+    const id = body.id
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    for (const t of ['payouts', 'video_submissions']) {
+      const r = await admin.from(t).delete().eq('creator_id', id)
+      if (r.error) return NextResponse.json({ error: r.error.message }, { status: 500 })
+    }
+    const c = await admin.from('creators').delete().eq('id', id)
+    if (c.error) return NextResponse.json({ error: c.error.message }, { status: 500 })
+    const u = await admin.auth.admin.deleteUser(id)
+    if (u.error && !/not found/i.test(u.error.message)) return NextResponse.json({ error: u.error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
+  // ---- delete one video submission ----
+  if (body.action === 'submission_delete') {
+    if (!body.id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const { error } = await admin.from('video_submissions').delete().eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
+  }
+
   // ---- create / update a campaign ----
   if (body.action === 'campaign_save') {
     const c = body.campaign

@@ -140,6 +140,20 @@ export default function AdminPage() {
     try { await call({ action: 'unmark_paid', id }); await load() } catch (err: any) { setError(err.message) }
   }
 
+  // ----- deletes -----
+  const deleteCreator = async (c: Creator) => {
+    const typed = prompt(`Delete ${c.name} (${c.email})?\n\nThis removes their login, all their videos and payout history. It can't be undone.\n\nType DELETE to confirm:`)
+    if (typed !== 'DELETE') return
+    setError('')
+    try { await call({ action: 'creator_delete', id: c.id }); await load() } catch (err: any) { setError(err.message) }
+  }
+  const deleteSubmission = async (s: Submission) => {
+    if (s.status === 'paid') { alert('This video is already paid. Undo the payment in Weekly pay first.'); return }
+    if (!confirm(`Delete this video submission?\n\n${s.video_url}`)) return
+    setError('')
+    try { await call({ action: 'submission_delete', id: s.id }); await load() } catch (err: any) { setError(err.message) }
+  }
+
   // ----- campaign editing (title + example videos; reward numbers live in lib/rewards.ts) -----
   const newCampaign = () => { setEditing({
     title: 'Mad Rewards', active: true, cadence: 'weekly',
@@ -582,7 +596,7 @@ export default function AdminPage() {
         {tab === 'creators' && (
           <div className="card table-scroll">
             <table className="tbl">
-              <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Cash App</th><th>TikTok</th><th>Instagram</th><th>Status</th><th>Joined</th></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Cash App</th><th>TikTok</th><th>Instagram</th><th>Joined</th><th></th></tr></thead>
               <tbody>
                 {creators.map((c) => (
                   <tr key={c.id}>
@@ -592,8 +606,8 @@ export default function AdminPage() {
                     <td>{c.cashapp || '—'}</td>
                     <td>{c.tiktok_handle || '—'}</td>
                     <td>{c.instagram_handle || '—'}</td>
-                    <td><span className={`pill ${c.status}`}>{c.status}</span></td>
                     <td className="muted">{fmtDate(c.created_at)}</td>
+                    <td><button className="btn btn-ghost danger sm" onClick={() => deleteCreator(c)}>Delete</button></td>
                   </tr>
                 ))}
                 {creators.length === 0 && <tr><td className="empty" colSpan={8}>No creators yet.</td></tr>}
@@ -639,7 +653,7 @@ export default function AdminPage() {
                     <div className="table-scroll" style={{ borderTop: '1px solid var(--line)' }}>
                       <table className="tbl">
                         <thead><tr>
-                          <th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th>
+                          <th>Video</th><th>Platform</th><th>Posted</th><th>Submitted</th><th>Claimed</th><th>Views (verified)</th><th>Status</th><th></th>
                         </tr></thead>
                         <tbody>
                           {g.entries.map((s) => (
@@ -659,6 +673,7 @@ export default function AdminPage() {
                                       {STATUS.map((o) => <option key={o} value={o}>{o}</option>)}
                                     </select>}
                               </td>
+                              <td><button className="btn btn-ghost danger sm" onClick={() => deleteSubmission(s)} title="Delete this submission">Delete</button></td>
                             </tr>
                           ))}
                         </tbody>
