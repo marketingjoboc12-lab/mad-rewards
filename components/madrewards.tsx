@@ -272,14 +272,14 @@ const ThemeStyles = () => (
     .font-arcade { font-family: 'Fredoka', 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
     .stk { background-color: var(--card); border: 1px solid var(--card-line); border-radius: 28px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 14px 32px -18px rgba(76,60,160,.28); }
     .stk-chip { border: 1px solid var(--card-line); border-radius: 999px; }
-    .stk-btn { border-radius: 999px; background: linear-gradient(135deg, #4F8BFF, #1D4FE0); color: #fff !important; box-shadow: 0 10px 24px -8px rgba(29,79,224,.55), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
-    .stk-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(29,79,224,.65), inset 0 1px 0 rgba(255,255,255,.35); }
+    .stk-btn { border-radius: 999px; background: linear-gradient(135deg, #7DB6FF, #3F7BE6); color: #fff !important; box-shadow: 0 10px 24px -8px rgba(63,123,230,.45), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+    .stk-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(63,123,230,.55), inset 0 1px 0 rgba(255,255,255,.35); }
     .stk-btn:active { transform: translateY(1px) scale(.98); }
     .stk-btn:focus-visible, .stk-chip:focus-visible, .pill-btn:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
     .gloss { position: relative; overflow: hidden; }
     .gloss::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 42%); pointer-events: none; border-radius: inherit; }
-    .g-blue  { background: linear-gradient(135deg, #5BA8FF 0%, #2F6BFF 45%, #1D3FD1 100%); }
-    .g-level { background: radial-gradient(120% 90% at 85% 15%, rgba(173,224,255,.75) 0%, rgba(173,224,255,0) 45%), linear-gradient(135deg, #3E8BFF 0%, #1F5BF0 50%, #1736B8 100%); }
+    .g-blue  { background: linear-gradient(135deg, #8CC2FF 0%, #5E9CF3 50%, #3F7BE6 100%); }
+    .g-level { background: radial-gradient(70% 90% at 82% 45%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%), linear-gradient(135deg, #8CC2FF 0%, #5E9CF3 48%, #3F7BE6 100%); }
     .ok-pill { background: #E3F7EC; color: #16794A; }
     .g-lime  { background: linear-gradient(135deg, #D7FF5C 0%, #7EE34B 55%, #23C483 100%); }
     .g-grape { background: linear-gradient(135deg, #A78BFA 0%, #7B5CFF 50%, #5B3DF5 100%); }
@@ -982,13 +982,16 @@ const useLeakGuard = (on) => {
 
 // ────────────────────────── RULES (shown in the swipe-to-agree popup + Rewards tab) ──────────────────────────
 const VIDEO_STYLES = [
-  { e: '😮', t: 'Reaction', d: 'React to the hit, the flavor, the vibe' },
-  { e: '🗣️', t: 'Review / talking', d: 'Talk to the camera, keep it real' },
-  { e: '🎙️', t: 'Voice-over', d: 'Narrate over clips of the device' },
-  { e: '🎵', t: 'Music / trend', d: 'Hop on a sound or trend' },
-  { e: '📸', t: 'Clean device shot', d: 'A clear, good-looking video of the device' },
-  { e: '💨', t: 'Blinker', d: 'You taking a blinker — on camera' },
-];
+  { t: 'Reaction', d: 'React to the hit, the flavor, the vibe' },
+  { t: 'Review / talking', d: 'Talk to the camera, keep it real' },
+  { t: 'Voice-over', d: 'Narrate over clips of the device' },
+  { t: 'Music / trend', d: 'Use a trending sound or format' },
+  { t: 'Clean device shot', d: 'A clear, good-looking video of the device' },
+  { t: 'Blinker', d: 'You taking a blinker, on camera' },
+  { t: 'Unboxing', d: 'Open it up and show it off' },
+  { t: 'Meme', d: 'A meme format with the device in it' },
+  { t: 'Cartoon / AI video', d: 'Animated or AI-made, brand clearly shown' },
+]
 
 const Sec = ({ title, children }) => (
   <section>
@@ -1003,17 +1006,17 @@ const Row = ({ left, right }) => (
 const RulesContent = () => (
   <div className="space-y-9 text-sm leading-relaxed">
     <div className="gloss g-grape rounded-[24px] p-5 text-white">
-      <div className="font-arcade text-xl">🤫 You've been personally invited</div>
+      <div className="font-arcade text-xl">You've been personally invited</div>
       <p className="mt-1.5">Mad Rewards is invite-only. You're one of a small group of creators we picked, and this offer is just for you.</p>
     </div>
 
-    <Sec title="How it works 💸">
+    <Sec title="How it works">
       <ol className="space-y-1.5">
-        <li>1️⃣ Post your Mad Labs videos <b>Sunday → Saturday</b></li>
-        <li>2️⃣ Drop every link + its views here by <b>Saturday 11:59pm</b></li>
-        <li>3️⃣ Forgot? We'll email you Sunday. That's your <b>last call</b> ⏰</li>
-        <li>4️⃣ <b>Monday</b> we check every video by hand 👀</li>
-        <li>5️⃣ Cash hits your Cash App 🤑</li>
+        <li><b>1.</b> Post your Mad Labs videos <b>Sunday to Saturday</b>.</li>
+        <li><b>2.</b> Submit every link and its views here by <b>Saturday 11:59pm</b>.</li>
+        <li><b>3.</b> Missed it? We'll email you Sunday. That's your <b>last call</b>.</li>
+        <li><b>4.</b> On <b>Monday</b> we check every video by hand.</li>
+        <li><b>5.</b> You get paid to your Cash App.</li>
       </ol>
 
       <div className="gloss g-level rounded-[24px] p-4 text-white">
@@ -1023,33 +1026,33 @@ const RulesContent = () => (
       </div>
 
       <div>
-        <div className="font-bold mb-1">📈 Your views stack</div>
+        <div className="font-bold mb-1">Your views stack</div>
         <p>Every video you post that week adds into one total. Example: 10 videos × 10K views = 100K = {fmtCash(PAY_PER_100K)}. Your all-time views keep stacking toward free merch, and your monthly views toward the big prizes.</p>
       </div>
 
       <div>
-        <div className="font-bold mb-1">🎁 Extras</div>
-        <Row left="😎 Mad Labs logo as your pfp" right={`+${fmtCash(LOGO_PFP_BONUS)}/week`} />
-        <Row left={`📦 ${REUP_VIDEOS} videos in 2 weeks`} right="Free re-up" />
-        {MILESTONES.map((ms) => <Row key={ms.views} left={`${ms.emoji} ${fmtViews(ms.views)} total views`} right={ms.label} />)}
-        {MONTHLY_PRIZES.map((p) => <Row key={p.views} left={`${p.emoji} ${fmtViews(p.views)} views in one month`} right={p.label} />)}
+        <div className="font-bold mb-1">Extras</div>
+        <Row left="Mad Labs logo as your profile pic" right={`+${fmtCash(LOGO_PFP_BONUS)}/week`} />
+        <Row left={`${REUP_VIDEOS} videos in 2 weeks`} right="Free re-up" />
+        {MILESTONES.map((ms) => <Row key={ms.views} left={`${fmtViews(ms.views)} total views`} right={ms.label} />)}
+        {MONTHLY_PRIZES.map((p) => <Row key={p.views} left={`${fmtViews(p.views)} views in one month`} right={p.label} />)}
       </div>
 
       <div className="rounded-[24px] p-4 bg-[var(--elev2)]">
-        <div className="font-bold mb-1">💎 This week's cap</div>
+        <div className="font-bold mb-1">This week's cap</div>
         <p>This week you can earn up to <b>{fmtCash(WEEKLY_CAP)}</b> from views (that's {fmtViews(CAP_VIEWS)} views). Anything past that still counts toward free merch and the big prizes.</p>
       </div>
 
-      <p className="text-xs text-[var(--text-dim)]">🔄 Rates, caps and rewards can change from week to week. Whatever you see on your dashboard is what that week pays.</p>
+      <p className="text-xs text-[var(--text-dim)]">Rates, caps and rewards can change from week to week. Whatever you see on your dashboard is what that week pays.</p>
     </Sec>
 
-    <Sec title="The rules 📜">
+    <Sec title="The rules">
       <div>
-        <div className="font-bold mb-2">🎬 Pick your style</div>
+        <div className="font-bold mb-2">Video styles that work</div>
         <div className="grid grid-cols-2 gap-2">
           {VIDEO_STYLES.map((v) => (
             <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)]">
-              <div className="font-semibold">{v.e} {v.t}</div>
+              <div className="font-semibold">{v.t}</div>
               <div className="text-xs text-[var(--text-dim)] mt-0.5">{v.d}</div>
             </div>
           ))}
@@ -1057,25 +1060,17 @@ const RulesContent = () => (
       </div>
 
       <div className="gloss g-sun rounded-[24px] p-4 text-black">
-        <div className="font-arcade text-base">🏷️ The #1 rule</div>
-        <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. 🤝</p>
-      </div>
-
-      <div className="rounded-[24px] p-4 border-2 border-[var(--danger)] bg-[var(--danger)]/10">
-        <div className="font-arcade text-base">🤐 Keep it secret</div>
-        <ul className="mt-1.5 space-y-1">
-          <li>📵 No screenshots or screen recordings of this site.</li>
-          <li>🙊 Don't post, share or send anything from here. Not online, not in DMs.</li>
-          <li>🎬 Never mention Mad Rewards, your payouts or this program in any video, caption, comment or story.</li>
-          <li>Every page is marked with your name. Leak it = you're out. 🚪</li>
-        </ul>
+        <div className="font-arcade text-base">Show the brand</div>
+        <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen, no pay.</p>
       </div>
 
       <ul className="space-y-2">
-        <li>🚫 <b>Video must still be up when we check Monday.</b> TikTok & IG take down cannabis stuff a lot. If it's gone, it doesn't count.</li>
-        <li>🧢 <b>No cap on views.</b> We verify every number. Fake numbers = you're out, no second chances.</li>
-        <li>🔁 <b>One link, one submission.</b> No double dipping.</li>
-        <li>⏰ <b>Late = locked.</b> Videos not submitted by Sunday 11:59pm don't count for that week.</li>
+        <li><b>Videos must still be up when we check Monday.</b> TikTok and Instagram often remove cannabis content. Removed videos don't count.</li>
+        <li><b>Report real views.</b> We verify every number. False numbers end your spot in the program.</li>
+        <li><b>One link, one submission.</b> Each video counts once.</li>
+        <li><b>Late videos don't count.</b> Anything not submitted by Sunday 11:59pm misses that week.</li>
+        <li><b>This site stays private.</b> No screenshots, screen recordings or sharing anything from here. Every page is marked with your name.</li>
+        <li><b>Don't mention the program.</b> Never say you're part of Mad Rewards, talk about payouts, or say how you got the product, in any video, caption, comment or story.</li>
       </ul>
     </Sec>
   </div>
@@ -1093,7 +1088,7 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
   const finish = () => { setX(max()); setDone(true); onDone(); };
   return (
     <div ref={track} className="relative h-[68px] rounded-full bg-[var(--elev2)] overflow-hidden select-none touch-none">
-      <div className="absolute inset-y-0 left-0 bg-[#2F6BFF]/20" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
+      <div className="absolute inset-y-0 left-0 bg-[#3F7BE6]/20" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
       <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
         {done ? "You're in 🤝" : locked ? '🔒 Scroll to the end to unlock' : <>{label} <span className="ml-2 slide-hint">→→</span></>}
       </div>
@@ -1131,14 +1126,14 @@ const RulesGate = ({ user, onAccept }) => {
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6">
       <div className="stk w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-b-none sm:rounded-[24px] bg-[var(--bg)] pop-in">
         <div className="px-6 pt-6 pb-3">
-          <h2 className="font-arcade text-3xl mt-1">Welcome, {(user.name || '').split(' ')[0] || 'fam'} 👋</h2>
+          <h2 className="font-arcade text-3xl mt-1">Welcome, {(user.name || '').split(' ')[0] || 'there'}</h2>
           <p className="text-sm text-[var(--text-dim)] mt-1">Read how it works and the rules, then slide to agree.</p>
         </div>
         <div ref={body} onScroll={checkEnd} className="px-6 pb-6 overflow-y-auto flex-1">
           <RulesContent />
         </div>
         <div className="p-6 pt-4 border-t border-[var(--border)]">
-          <p className="text-xs text-[var(--text-dim)] mb-3 text-center">By sliding, you confirm you read it all and agree. ✅</p>
+          <p className="text-xs text-[var(--text-dim)] mb-3 text-center">By sliding, you confirm you read it all and agree.</p>
           <SlideToAgree onDone={accept} label="I read it all & agree" locked={!readAll} />
           {error && <p className="text-xs text-[var(--danger)] mt-3 text-center font-semibold">{error}</p>}
         </div>
@@ -1171,30 +1166,58 @@ const useCountUp = (target, ms = 900) => {
 };
 
 const Confetti = () => {
-  const bits = ['💸', '🎉', '✨', '🔥', '💚', '🤑'];
+  const colors = ['#7FB8FF', '#3D7BEA', '#FFD23F', '#FF8AC6', '#B8F0D2', '#C7B8FF'];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      {Array.from({ length: 18 }).map((_, i) => (
-        <span key={i} className="confetti-bit" style={{ left: `${(i * 53) % 100}%`, animationDelay: `${(i % 6) * 0.08}s`, fontSize: 18 + (i % 3) * 8 }}>
-          {bits[i % bits.length]}
-        </span>
+      {Array.from({ length: 22 }).map((_, i) => (
+        <span key={i} className="confetti-bit rounded-sm" style={{ left: `${(i * 47) % 100}%`, animationDelay: `${(i % 7) * 0.07}s`, width: 7 + (i % 3) * 2, height: 11 + (i % 2) * 4, background: colors[i % colors.length] }} />
       ))}
     </div>
   );
 };
 
-// Popup after a creator drops a video.
+// The Mad Labs "M", drawn as a path so it can sit inside the emblem.
+const MadM = ({ className = '' }) => (
+  <svg viewBox="0 0 100 100" className={className} aria-hidden>
+    <path fill="currentColor" d="M10 10 L50 57 L90 10 L90 33 Q90 40 85 46 L50 88 L15 46 Q10 40 10 33 Z" />
+    <path fill="currentColor" d="M30 77 L19 62 Q13 58 9.5 66 Q6.5 79 17 83 Q25.5 85.5 30 77 Z" />
+    <path fill="currentColor" d="M70 77 L81 62 Q87 58 90.5 66 Q93.5 79 83 83 Q74.5 85.5 70 77 Z" />
+  </svg>
+);
+
+// Glossy winged badge with the M, like a game rank emblem.
+const MEmblem = ({ size = 132 }) => (
+  <svg width={size} height={size} viewBox="0 0 160 160" aria-hidden className="drop-shadow-[0_14px_22px_rgba(30,70,170,.35)]">
+    <defs>
+      <linearGradient id="emWing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#E6F2FF" /><stop offset="1" stopColor="#7FB0F5" /></linearGradient>
+      <linearGradient id="emHex" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#9FD0FF" /><stop offset=".55" stopColor="#4A8BF0" /><stop offset="1" stopColor="#2559D6" /></linearGradient>
+      <linearGradient id="emInner" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5FA2FF" /><stop offset="1" stopColor="#2A62DC" /></linearGradient>
+      <linearGradient id="emShine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fff" stopOpacity=".7" /><stop offset=".5" stopColor="#fff" stopOpacity="0" /></linearGradient>
+    </defs>
+    <g fill="url(#emWing)" stroke="#fff" strokeOpacity=".6" strokeWidth="1.5">
+      <path d="M44 52 L8 34 L18 62 L4 66 L22 86 L12 94 L40 104 Z" />
+      <path d="M116 52 L152 34 L142 62 L156 66 L138 86 L148 94 L120 104 Z" />
+    </g>
+    <path d="M80 14 L132 44 L132 104 L80 134 L28 104 L28 44 Z" fill="url(#emHex)" stroke="#fff" strokeOpacity=".85" strokeWidth="3" />
+    <path d="M80 30 L118 52 L118 96 L80 118 L42 96 L42 52 Z" fill="url(#emInner)" stroke="#CFE6FF" strokeOpacity=".9" strokeWidth="2" />
+    <path d="M80 14 L132 44 L132 70 Q80 58 28 70 L28 44 Z" fill="url(#emShine)" />
+    <g transform="translate(55 49) scale(.5)" color="#fff"><MadM /></g>
+    <path d="M80 4 L90 14 L80 22 L70 14 Z" fill="#F4D7A8" stroke="#fff" strokeWidth="1.5" />
+  </svg>
+);
+
+// Popup after a creator submits videos.
 const DropCelebration = ({ data, onClose }) => (
-  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5" onClick={onClose}>
-    <div className="stk relative overflow-hidden w-full max-w-sm bg-[var(--elev1)] p-7 text-center pop-in" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Video dropped">
+  <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-5" onClick={onClose}>
+    <div className="stk relative overflow-hidden w-full max-w-sm p-7 text-center pop-in" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Videos submitted">
       <Confetti />
       <div className="relative">
-        <div className="text-6xl">{data.levelUp ? LEVELS[data.level].emoji : '🎉'}</div>
-        <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : data.count > 1 ? `${data.count} videos dropped!` : 'Dropped!'}</h2>
-        {data.levelUp && <p className="mt-1 font-semibold">You're now <b>{LEVELS[data.level].name}</b> {LEVELS[data.level].emoji}</p>}
-        <div className="mt-5 inline-block rounded-full g-blue text-white font-arcade text-2xl px-5 py-2 border-0">+{fmtCash(data.added)}</div>
-        <p className="mt-3 text-sm text-[var(--text-dim)]">added to this week's bag (pending until we check Monday) 👀</p>
-        <button onClick={onClose} className="stk-btn mt-6 w-full h-14 font-bold text-base">Keep stacking 💪</button>
+        <div className="flex justify-center"><MEmblem size={96} /></div>
+        <h2 className="font-arcade text-3xl mt-3">{data.count > 1 ? `${data.count} videos submitted` : 'Video submitted'}</h2>
+        {data.levelUp && <p className="mt-1 font-semibold">New level: {LEVELS[data.level].name} {LEVELS[data.level].emoji}</p>}
+        <div className="mt-5 inline-block rounded-full g-blue text-white font-arcade text-2xl px-5 py-2">+{fmtCash(data.added)}</div>
+        <p className="mt-3 text-sm text-[var(--text-dim)]">Added to this week's total, pending Monday's check.</p>
+        <button onClick={onClose} className="stk-btn mt-6 w-full h-14 font-bold text-base">Done</button>
       </div>
     </div>
   </div>
@@ -1248,20 +1271,20 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <h1 className="font-arcade text-3xl md:text-4xl leading-none">Welcome back, {user.name.split(' ')[0]}.</h1>
         <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'g-sun text-black border-transparent' : 'bg-[var(--card)]'}`}>
-          <span className="mr-1.5">⏰</span>{lastCall ? 'Last call: closes tonight 11:59pm' : 'Submit by Sat 11:59pm'}
+          {lastCall ? 'Last call: closes tonight 11:59pm' : 'Submit by Sat 11:59pm'}
         </span>
       </div>
 
       {/* LEVEL CARD — the one big moment */}
-      <section className="gloss g-level rounded-[32px] p-6 md:p-8 text-white shadow-[0_24px_48px_-20px_rgba(31,91,240,.6)]" aria-label="This week">
+      <section className="gloss g-level rounded-[32px] p-6 md:p-8 text-white shadow-[0_24px_48px_-20px_rgba(63,123,230,.45)]" aria-label="This week">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-bold">This week's level</span>
-            <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none">{LEVELS[lvl].name}</div>
+            <span className="inline-block rounded-full bg-white/25 px-3 py-1 text-xs font-bold">This week's level</span>
+            <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none flex items-center gap-2.5">{LEVELS[lvl].name}<span className="text-base rounded-full bg-white/25 px-2.5 py-0.5">{LEVELS[lvl].emoji}</span></div>
             <div className="mt-4 text-sm font-semibold opacity-80">Your bag so far</div>
             <div className="font-arcade text-6xl md:text-7xl leading-none tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
           </div>
-          <div className="badge-orb flex-shrink-0" aria-hidden>{LEVELS[lvl].emoji}</div>
+          <div className="flex-shrink-0 -mr-2 -mt-2"><MEmblem size={128} /></div>
         </div>
 
         <div className="mt-6">
@@ -1274,38 +1297,41 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
           <p className="mt-2 text-sm font-semibold">
             {nextLvl
               ? <>{fmtViews(nextLvl.at - w.views)} more views to unlock {nextLvl.emoji} {nextLvl.name}</>
-              : <>You maxed out this week. Absolute legend 👑</>}
+              : <>You hit this week's cap.</>}
           </p>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold">
-          <span className="rounded-full bg-white/20 px-3 py-1.5">👀 {nf(w.views)} views</span>
-          <span className="rounded-full bg-white/20 px-3 py-1.5">🎬 {w.videos} video{w.videos === 1 ? '' : 's'}</span>
-          <span className="rounded-full bg-white/20 px-3 py-1.5">💸 This week: {fmtCash(PAY_PER_100K)} per 100K</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">{nf(w.views)} views</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">{w.videos} video{w.videos === 1 ? '' : 's'}</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">This week: {fmtCash(PAY_PER_100K)} per 100K</span>
         </div>
         <p className="mt-3 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button onClick={() => setView('drop')} className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>📲</span><span>Drop your videos</span></button>
-        <button onClick={() => setView('ideas')} className="flex items-center justify-center gap-2 h-16 rounded-full bg-[var(--card)] border border-[#2F6BFF]/30 text-[#2F6BFF] font-arcade text-lg shadow-[0_10px_24px_-14px_rgba(29,79,224,.45)] hover:bg-[#2F6BFF]/5,61,245,.7)]"><span>💡</span><span>Examples of videos that hit</span></button>
+        <button onClick={() => setView('drop')} className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>Drop your videos</span></button>
+        <button onClick={() => setView('ideas')} className="flex flex-col items-center justify-center h-16 rounded-full bg-[var(--card)] border border-[#3F7BE6]/30 text-[#3F7BE6] shadow-[0_10px_24px_-14px_rgba(63,123,230,.45)] hover:bg-[#3F7BE6]/5">
+          <span className="font-arcade text-lg leading-tight">Video ideas</span>
+          <span className="text-xs font-semibold text-[var(--text-dim)]">Out of ideas? See what's working</span>
+        </button>
       </div>
 
       {/* LEADERBOARD */}
       <section className="stk p-5 md:p-6" aria-label="Leaderboard">
         <div className="flex items-center justify-between">
-          <h2 className="font-arcade text-xl">🏆 Top this week</h2>
+          <h2 className="font-arcade text-xl">Top this week</h2>
           {meRow && meRow.views > 0 && <span className="pill-btn g-blue text-white">You're #{meRow.rank}</span>}
         </div>
         {board === null ? (
           <p className="mt-4 text-sm text-[var(--text-dim)]">Loading the board…</p>
         ) : board.every((r) => r.views === 0) ? (
-          <p className="mt-4 text-sm text-[var(--text-dim)]">Nobody's on the board yet this week. Drop a video and take #1 👀</p>
+          <p className="mt-4 text-sm text-[var(--text-dim)]">Nobody's on the board yet this week. Submit a video to take #1.</p>
         ) : (
           <>
-            <div className="mt-4 space-y-2.5 rounded-[22px] border-2 border-dashed border-[#2F6BFF]/35 p-3">
+            <div className="mt-4 space-y-2.5 rounded-[22px] border-2 border-dashed border-[#3F7BE6]/35 p-3">
               {top3.map((r, i) => (
-                <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#2F6BFF]/10' : ''}`}>
+                <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#3F7BE6]/10' : ''}`}>
                   <span className={`rank ${rankBg[i]}`}>{r.rank}</span>
                   <span className="text-2xl" aria-hidden>{medal[i]}</span>
                   <div className="min-w-0 flex-1">
@@ -1319,7 +1345,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
             {rest.length > 0 && (
               <div className="mt-3 space-y-1">
                 {rest.map((r) => (
-                  <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#2F6BFF]/10' : ''}`}>
+                  <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#3F7BE6]/10' : ''}`}>
                     <span className="rank bg-[var(--elev2)]">{r.rank}</span>
                     <div className="min-w-0 flex-1 font-semibold truncate">{r.name}{r.me && ' (you)'}</div>
                     <div className="font-bold text-sm">{fmtViews(r.views)}</div>
@@ -1333,8 +1359,8 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
       {/* REWARDS ROW */}
       <section aria-label="Rewards">
-        <h2 className="font-arcade text-xl mb-1">🎁 Rewards to unlock</h2>
-        <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash 💸 Free merch unlocks with your total views, big prizes with one month's views.</p>
+        <h2 className="font-arcade text-xl mb-1">Rewards to unlock</h2>
+        <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash. Free merch unlocks with your total views, big prizes with one month's views.</p>
         <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pb-2 snap-x">
           {prizes.map((p) => (
             <div key={p.key} className="snap-start flex-shrink-0 w-[150px] text-center">
@@ -1354,7 +1380,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
       {/* SIDE QUESTS */}
       <section className="stk p-2" aria-label="Side quests">
-        <h2 className="font-arcade text-xl px-4 pt-3 pb-1">⚡ Side quests</h2>
+        <h2 className="font-arcade text-xl px-4 pt-3 pb-1">Bonuses</h2>
         {[
           { emoji: '📦', title: 'Free re-up', sub: `Post ${REUP_VIDEOS} videos by ${fmtDay(reup.end)}`, pill: reup.videos >= REUP_VIDEOS ? 'Earned ✓' : `${reup.videos}/${REUP_VIDEOS}`, done: reup.videos >= REUP_VIDEOS },
           { emoji: '😎', title: 'Logo pfp', sub: 'Make the Mad Labs logo your profile pic', pill: `+${fmtCash(LOGO_PFP_BONUS)}/wk`, done: false },
@@ -1374,13 +1400,13 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
       <section aria-label="Recent videos">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-arcade text-xl">🎬 Your drops</h2>
+          <h2 className="font-arcade text-xl">Your videos</h2>
           <button onClick={() => setView('history')} className="text-sm font-bold underline underline-offset-4">See all</button>
         </div>
         {mine.length === 0 ? (
           <div className="stk p-8 text-center">
             <div className="text-4xl">🎬</div>
-            <p className="mt-2 font-semibold">Nothing yet. Hit "Drop your videos" above and start stacking.</p>
+            <p className="mt-2 font-semibold">No videos yet. Tap "Drop your videos" to add this week's.</p>
           </div>
         ) : (
           <div className="space-y-2.5">{mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} />)}</div>
@@ -1464,13 +1490,13 @@ const DropPage = ({ submissions, onSubmit, setView }) => {
 
       <div>
         <button onClick={() => setView('dash')} className="text-sm font-bold text-[var(--text-dim)] hover:text-[var(--text)]">← Home</button>
-        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Drop your videos 📲</h1>
+        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Drop your videos</h1>
         <p className="mt-2 text-[var(--text-dim)]">Add every video you posted this week, one row each, then drop them all at once. Due Saturday 11:59pm.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => setPasting((p) => !p)} className="pill-btn bg-[var(--elev2)]">📋 Paste a list of links</button>
-        <button onClick={() => setView('ideas')} className="pill-btn bg-[var(--elev2)]">💡 Need ideas?</button>
+        <button onClick={() => setPasting((p) => !p)} className="pill-btn bg-[var(--elev2)]">Paste a list of links</button>
+        <button onClick={() => setView('ideas')} className="pill-btn bg-[var(--elev2)]">Video ideas</button>
       </div>
 
       {pasting && (
@@ -1515,7 +1541,7 @@ const DropPage = ({ submissions, onSubmit, setView }) => {
         ))}
       </div>
 
-      <button onClick={() => setRows((rs) => [...rs, blankRow(rs[rs.length - 1]?.postedAt || today)])} className="w-full h-14 rounded-[24px] border-2 border-dashed border-[#2F6BFF]/40 font-bold text-[#2F6BFF] hover:bg-[#2F6BFF]/5">
+      <button onClick={() => setRows((rs) => [...rs, blankRow(rs[rs.length - 1]?.postedAt || today)])} className="w-full h-14 rounded-[24px] border-2 border-dashed border-[#3F7BE6]/40 font-bold text-[#3F7BE6] hover:bg-[#3F7BE6]/5">
         + Add another video
       </button>
 
@@ -1526,7 +1552,7 @@ const DropPage = ({ submissions, onSubmit, setView }) => {
             {ready && preview > 0 && <span className="text-[var(--text-dim)]"> · ≈ +{fmtCash(preview)}</span>}
           </div>
           <button onClick={dropAll} disabled={!ready || busy} className="stk-btn h-14 px-7 font-arcade text-lg w-full sm:w-auto disabled:opacity-40 disabled:pointer-events-none">
-            {busy ? 'Dropping…' : `Drop ${filled.length > 1 ? 'them all' : 'it'} 🚀`}
+            {busy ? 'Submitting…' : `Submit ${filled.length > 1 ? `all ${filled.length}` : 'video'}`}
           </button>
         </div>
         <p className="text-[11px] text-[var(--text-faint)] mt-2">All data is verified. Submitting false info means losing access to the program.</p>
@@ -1542,8 +1568,8 @@ const IdeasPage = ({ deal, setView }) => {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <button onClick={() => setView('dash')} className="text-sm font-bold text-[var(--text-dim)] hover:text-[var(--text)]">← Home</button>
-        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Videos that hit 💡</h1>
-        <p className="mt-2 text-[var(--text-dim)]">Out of ideas? Recreate one of these in your own style. Keep MAD LABS clearly visible.</p>
+        <h1 className="font-arcade text-4xl md:text-5xl mt-3">Video ideas</h1>
+        <p className="mt-2 text-[var(--text-dim)]">Out of ideas? See what's working and recreate it in your own style. Keep MAD LABS clearly visible.</p>
       </div>
       {examples.length === 0 ? (
         <div className="stk p-8 text-center">
@@ -1565,11 +1591,11 @@ const IdeasPage = ({ deal, setView }) => {
         </div>
       )}
       <div className="stk p-5">
-        <h2 className="font-arcade text-xl mb-3">🎬 Styles that work</h2>
+        <h2 className="font-arcade text-xl mb-3">Styles that work</h2>
         <div className="grid grid-cols-2 gap-2">
           {VIDEO_STYLES.map((v) => (
             <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)]">
-              <div className="font-semibold text-sm">{v.e} {v.t}</div>
+              <div className="font-semibold text-sm">{v.t}</div>
               <div className="text-xs text-[var(--text-dim)] mt-0.5">{v.d}</div>
             </div>
           ))}
@@ -1610,8 +1636,8 @@ const SubmissionRow = ({ sub }) => {
 const CreatorRewards = () => (
   <div className="space-y-8 md:space-y-10">
     <div className="anim-fade-up">
-      <h1 className="font-arcade text-4xl md:text-5xl mt-2">The deal 🤝</h1>
-      <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place. 📌</p>
+      <h1 className="font-arcade text-4xl md:text-5xl mt-2">How it works</h1>
+      <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place.</p>
     </div>
     <div className="stk p-6 md:p-8 max-w-2xl">
       <RulesContent />
@@ -1627,7 +1653,7 @@ const CreatorHistory = ({ submissions }) => {
   return (
     <div className="space-y-8 md:space-y-10">
       <div className="anim-fade-up">
-        <h1 className="font-arcade text-4xl md:text-5xl">Your drops 🎬</h1>
+        <h1 className="font-arcade text-4xl md:text-5xl">Your videos</h1>
         <p className="mt-3 text-[var(--text-dim)]">Every video you've submitted and where it's at.</p>
       </div>
 
