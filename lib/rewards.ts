@@ -10,35 +10,42 @@
 //  morning; Sunday is a grace day. Employee verifies Monday.
 // ============================================================
 
-export type ViewTier = { views: number; amount: number; label: string }
-export type PostingBonus = { videos: number; days: number; amount: number; label: string }
-export type MonthlyPrize = { views: number; label: string }
+export type RateBand = { upTo: number; per10k: number }
+export type Milestone = { views: number; label: string; emoji: string }
+export type MonthlyPrize = { views: number; label: string; emoji: string }
 
-// Weekly view rewards — creator gets the HIGHEST tier hit (not all of them).
-export const VIEW_TIERS: ViewTier[] = [
-  { views: 25_000, amount: 25, label: '$25' },
-  { views: 50_000, amount: 50, label: '$50' },
-  { views: 100_000, amount: 100, label: '$100' },
-  { views: 250_000, amount: 200, label: '$200' },
-  { views: 500_000, amount: 350, label: '$350' },
-  { views: 1_000_000, amount: 600, label: '$600' },
+// Weekly pay, tax-bracket style: each band of views pays its own rate,
+// so more views ALWAYS means more money (nobody aims for 490K over 500K).
+//   100K = $100 · 250K = $212.50 · 500K = $400 · 1M = $650 · 2M = $900
+export const RATE_BANDS: RateBand[] = [
+  { upTo: 100_000, per10k: 10 },
+  { upTo: 500_000, per10k: 7.5 },
+  { upTo: 1_000_000, per10k: 5 },
+  { upTo: Infinity, per10k: 2.5 },
 ]
 
-// Weekly posting bonus — stacks on top of the view reward. Highest one only.
-// `days` = number of DIFFERENT days the videos were posted on that week.
-export const POSTING_BONUSES: PostingBonus[] = [
-  { videos: 5, days: 5, amount: 25, label: '$25 or product re-up' },
-  { videos: 10, days: 7, amount: 50, label: '$50 + product re-up' },
-]
+// Most anyone can earn from views in one week (logo bonus is on top).
+export const WEEKLY_CAP = 1000
 
 // Flat weekly bonus when their profile pic is the Mad Labs logo.
-// Employee ticks a box on Monday when checking; stacks on everything else.
+// Employee ticks a box on Monday when checking.
 export const LOGO_PFP_BONUS = 10
 
-// Monthly prizes (calendar month) — highest one only. Paid/handled by hand.
+// Free product re-up: this many videos within a 2-week period.
+export const REUP_VIDEOS = 10
+// 2-week periods start on this Sunday and repeat every 14 days.
+export const REUP_ANCHOR = '2026-10-04'
+
+// Free merch, unlocked once by TOTAL verified views since joining.
+export const MILESTONES: Milestone[] = [
+  { views: 100_000, label: 'Mad Labs socks', emoji: '🧦' },
+  { views: 250_000, label: 'Mad Labs shirt', emoji: '👕' },
+]
+
+// Big monthly prizes (calendar month) — highest one only.
 export const MONTHLY_PRIZES: MonthlyPrize[] = [
-  { views: 3_000_000, label: 'New iPhone' },
-  { views: 10_000_000, label: 'Trip for 2' },
+  { views: 3_000_000, label: 'iPhone 18 Pro Max', emoji: '📱' },
+  { views: 10_000_000, label: 'Trip for 2 — New York or Mexico', emoji: '✈️' },
 ]
 
 // All dates are judged in this time zone (the deadline is 11:59pm here).
@@ -96,14 +103,30 @@ export const countedViews = (s: SubLike, estimate: boolean) => {
 const counts = (s: SubLike, estimate: boolean) =>
   s.status === 'approved' || s.status === 'paid' || (estimate && s.status === 'pending')
 
-export const viewTierFor = (views: number) =>
-  [...VIEW_TIERS].reverse().find((t) => views >= t.views) || null
+// Dollars earned for a week's views (before the cap).
+export const rawPayForViews = (views: number) => {
+  let left = Math.max(0, views), floor = 0, pay = 0
+  for (const b of RATE_BANDS) {
+    const inBand = Math.min(left, b.upTo - floor)
+    pay += (inBand / 10_000) * b.per10k
+    left -= inBand; floor = b.upTo
+    if (left <= 0) break
+  }
+  return Math.round(pay * 100) / 100
+}
+export const payForViews = (views: number) => Math.min(WEEKLY_CAP, rawPayForViews(views))
 
-export const bonusFor = (videos: number, days: number) =>
-  [...POSTING_BONUSES].reverse().find((b) => videos >= b.videos && days >= b.days) || null
+// Views needed to reach the cap (≈2.4M).
+export const CAP_VIEWS = (() => { let v = 0; while (rawPayForViews(v) < WEEKLY_CAP) v += 10_000; return v })()
 
 export const prizeFor = (views: number) =>
   [...MONTHLY_PRIZES].reverse().find((p) => views >= p.views) || null
+
+// 2-week re-up period containing `d`.
+export const reupPeriodStart = (d: string) => {
+  const weeks = Math.floor((toUTC(weekStart(d)) - toUTC(REUP_ANCHOR)) / (7 * DAY))
+  return addDays(REUP_ANCHOR, Math.floor(weeks / 2) * 14)
+}
 
 export type WeekResult = {
   start: string
@@ -111,27 +134,36 @@ export type WeekResult = {
   videos: number
   days: number
   pending: number
-  viewTier: ViewTier | null
-  bonus: PostingBonus | null
-  total: number
+  pay: number       // view pay after the cap
+  capped: boolean
 }
 
-// Everything for one creator's week. `subs` can be all their submissions.
+// One creator's week. `subs` can be all their submissions.
 export const computeWeek = (subs: SubLike[], start: string, estimate = false): WeekResult => {
   const end = addDays(start, 6)
   const inWeek = subs.filter((s) => s.posted >= start && s.posted <= end)
   const counted = inWeek.filter((s) => counts(s, estimate))
   const views = counted.reduce((a, s) => a + countedViews(s, estimate), 0)
-  const days = new Set(counted.map((s) => s.posted)).size
-  const viewTier = viewTierFor(views)
-  const bonus = bonusFor(counted.length, days)
   return {
-    start, views, videos: counted.length, days,
+    start, views, videos: counted.length,
+    days: new Set(counted.map((s) => s.posted)).size,
     pending: inWeek.filter((s) => s.status === 'pending').length,
-    viewTier, bonus,
-    total: (viewTier?.amount || 0) + (bonus?.amount || 0),
+    pay: payForViews(views),
+    capped: rawPayForViews(views) > WEEKLY_CAP,
   }
 }
+
+// Re-up progress for the 2-week period containing `d`.
+export const computeReup = (subs: SubLike[], d: string, estimate = false) => {
+  const start = reupPeriodStart(d), end = addDays(start, 13)
+  const videos = subs.filter((s) => s.posted >= start && s.posted <= end && counts(s, estimate)).length
+  return { start, end, videos, earned: videos >= REUP_VIDEOS }
+}
+
+// Lifetime verified views and which merch milestones they've passed.
+export const lifetimeViews = (subs: SubLike[], upTo?: string, estimate = false) =>
+  subs.filter((s) => !upTo || s.posted <= upTo).reduce((a, s) => a + countedViews(s, estimate), 0)
+export const milestonesReached = (views: number) => MILESTONES.filter((m) => views >= m.views)
 
 export type MonthResult = { start: string; views: number; prize: MonthlyPrize | null; next: MonthlyPrize | null }
 
@@ -139,8 +171,7 @@ export const computeMonth = (subs: SubLike[], start: string, estimate = false): 
   const views = subs
     .filter((s) => s.posted.slice(0, 7) === start.slice(0, 7))
     .reduce((a, s) => a + countedViews(s, estimate), 0)
-  const prize = prizeFor(views)
-  return { start, views, prize, next: MONTHLY_PRIZES.find((p) => p.views > views) || null }
+  return { start, views, prize: prizeFor(views), next: MONTHLY_PRIZES.find((p) => p.views > views) || null }
 }
 
 // Strip tracking junk so the same video can't be submitted twice

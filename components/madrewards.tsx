@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { supabase, SUPABASE_URL_IN_USE } from '@/lib/supabase';
 import {
-  VIEW_TIERS, POSTING_BONUSES, MONTHLY_PRIZES, LOGO_PFP_BONUS,
-  computeWeek, computeMonth, todayLocal, weekStart, monthStart, addDays,
+  RATE_BANDS, WEEKLY_CAP, CAP_VIEWS, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
+  computeWeek, computeMonth, computeReup, lifetimeViews, payForViews, todayLocal, weekStart, monthStart, addDays,
   weekLabel, monthLabel, earliestSubmittableDate, normalizeVideoUrl,
 } from '@/lib/rewards';
 
@@ -249,6 +249,23 @@ const ThemeStyles = () => (
     }
 
     .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; }
+
+    /* ── game layer: sticker-bomb arcade ── */
+    :root { --ink: #f5f5f5; --lime: #C6FF3D; --grape: #7B5CFF; --gum: #FF4FB8; --sun: #FFD23F; }
+    .light { --ink: #000000; }
+    .font-arcade { font-family: 'Dela Gothic One', 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.01em; }
+    .stk { border: 2.5px solid var(--ink); border-radius: 24px; box-shadow: 5px 5px 0 var(--ink); }
+    .stk-chip { border: 2px solid var(--ink); border-radius: 999px; }
+    .stk-btn { border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: 4px 4px 0 var(--lime); transition: transform .12s var(--ease), box-shadow .12s var(--ease); }
+    .stk-btn:hover { transform: translate(-1px,-1px); box-shadow: 6px 6px 0 var(--lime); }
+    .stk-btn:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--lime); }
+    .stk-btn:focus-visible, .stk-chip:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
+    .tilt-l { transform: rotate(-1.5deg); } .tilt-r { transform: rotate(1.5deg); }
+    @keyframes popIn { 0% { transform: scale(.7); opacity: 0 } 70% { transform: scale(1.04); opacity: 1 } 100% { transform: scale(1) } }
+    .pop-in { animation: popIn .45s var(--ease) both; }
+    @keyframes confettiFall { 0% { transform: translateY(-40px) rotate(0); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(420px) rotate(320deg); opacity: 0 } }
+    .confetti-bit { position: absolute; top: 0; animation: confettiFall 1.6s ease-in both; }
+    @media (prefers-reduced-motion: reduce) { .pop-in, .confetti-bit { animation: none; } .confetti-bit { display: none; } .tilt-l, .tilt-r { transform: none; } }
     .font-mono    { font-family: 'JetBrains Mono', monospace; }
     body, .font-body { font-family: 'Manrope', system-ui, sans-serif; }
 
@@ -809,9 +826,9 @@ const RequestPage = ({ go, onSubmit }) => {
 const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const tabs = [
-    { k: 'dash',    label: 'Dashboard',  icon: BarChart3 },
-    { k: 'rewards', label: 'Rewards',    icon: Trophy },
-    { k: 'history', label: 'Submissions', icon: Inbox },
+    { k: 'dash',    label: 'Home',      icon: BarChart3 },
+    { k: 'history', label: 'My drops',  icon: Inbox },
+    { k: 'rewards', label: 'Rules',     icon: Trophy },
   ];
 
   return (
@@ -892,10 +909,10 @@ const VIDEO_STYLES = [
 const RulesContent = () => (
   <div className="space-y-7 text-sm leading-relaxed">
     <div>
-      <h3 className="font-display font-bold text-lg mb-3">🎬 Pick your style</h3>
+      <h3 className="font-arcade text-lg mb-3">🎬 Pick your style</h3>
       <div className="grid grid-cols-2 gap-2">
         {VIDEO_STYLES.map((s) => (
-          <div key={s.t} className="p-3 rounded-2xl bg-[var(--elev2)] border border-[var(--border)]">
+          <div key={s.t} className="p-3 rounded-2xl bg-[var(--elev2)] border-2 border-[var(--ink)]">
             <div className="font-semibold">{s.e} {s.t}</div>
             <div className="text-xs text-[var(--text-dim)] mt-0.5">{s.d}</div>
           </div>
@@ -903,24 +920,24 @@ const RulesContent = () => (
       </div>
     </div>
 
-    <div className="p-4 rounded-2xl border-2 border-[var(--accent)] bg-[var(--accent-soft)]">
-      <div className="font-display font-bold text-base">🏷️ The #1 rule</div>
+    <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--lime)] text-black">
+      <div className="font-arcade text-base">🏷️ The #1 rule</div>
       <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. Simple as that. 🤝</p>
     </div>
 
     <div>
-      <h3 className="font-display font-bold text-lg mb-2">📅 How the week works</h3>
+      <h3 className="font-arcade text-lg mb-2">📅 How the week works</h3>
       <ol className="space-y-1.5">
         <li>1️⃣ Post your videos <b>Sunday → Saturday</b></li>
         <li>2️⃣ Drop every link + its views here by <b>Saturday 11:59pm</b></li>
         <li>3️⃣ Forgot? We'll email you Sunday — that's your <b>last call</b> ⏰</li>
         <li>4️⃣ <b>Monday</b> we check every video by hand 👀</li>
-        <li>5️⃣ You get paid 💸</li>
+        <li>5️⃣ Cash hits your Cash App 💸</li>
       </ol>
     </div>
 
     <div>
-      <h3 className="font-display font-bold text-lg mb-2">🚨 Don't fumble the bag</h3>
+      <h3 className="font-arcade text-lg mb-2">🚨 Don't fumble the bag</h3>
       <ul className="space-y-1.5">
         <li>🚫 <b>Video must still be up when we check Monday.</b> TikTok & IG take down cannabis stuff a lot — if it's gone, it doesn't count.</li>
         <li>🧢 <b>No cap on views.</b> We verify every number. Fake numbers = you're out, no second chances.</li>
@@ -929,20 +946,23 @@ const RulesContent = () => (
     </div>
 
     <div>
-      <h3 className="font-display font-bold text-lg mb-2">💰 What you can earn</h3>
+      <h3 className="font-arcade text-lg mb-2">💰 How you get paid</h3>
+      <p className="mb-2">Every week, your views turn into cash. The more you get, the higher your level:</p>
       <div className="space-y-1">
-        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)]">Weekly views (you get your highest tier)</div>
-        {VIEW_TIERS.map((t) => (
-          <div key={t.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{fmtViews(t.views)} views</span><b className="text-[var(--accent)]">{t.label}</b></div>
+        {RATE_BANDS.map((b, i) => (
+          <div key={i} className="flex justify-between border-b border-[var(--border)] py-1.5">
+            <span>{LEVELS[i].emoji} {LEVELS[i].name} <span className="text-[var(--text-dim)]">({bandLabel(i)} views)</span></span>
+            <b>{fmtCash(b.per10k)} / 10K</b>
+          </div>
         ))}
-        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] pt-3">Weekly posting bonus (on top 🔥)</div>
-        {POSTING_BONUSES.map((b) => (
-          <div key={b.videos} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{b.videos}+ videos on {b.days === 7 ? 'all 7' : `${b.days}+ different`} days</span><b className="text-[var(--accent)]">{b.label}</b></div>
+        <p className="text-xs text-[var(--text-dim)] pt-1">e.g. 100K = {fmtCash(payForViews(100_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))} · max {fmtCash(WEEKLY_CAP)}/week</p>
+        <div className="flex justify-between border-b border-[var(--border)] py-1.5 pt-3"><span>😎 Mad Labs logo as your pfp</span><b>+{fmtCash(LOGO_PFP_BONUS)}/week</b></div>
+        <div className="flex justify-between border-b border-[var(--border)] py-1.5"><span>🎁 {REUP_VIDEOS} videos in 2 weeks</span><b>Free re-up</b></div>
+        {MILESTONES.map((ms) => (
+          <div key={ms.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{ms.emoji} {fmtViews(ms.views)} total views</span><b>{ms.label}</b></div>
         ))}
-        <div className="flex justify-between border-b border-[var(--border)] py-1.5"><span>Mad Labs logo as your pfp 😎</span><b className="text-[var(--accent)]">+{fmtMoney(LOGO_PFP_BONUS)}/week</b></div>
-        <div className="text-xs uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] pt-3">Monthly big prizes 🏆</div>
         {MONTHLY_PRIZES.map((p) => (
-          <div key={p.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{fmtViews(p.views)} views in a month</span><b className="text-[var(--accent)]">{p.label}</b></div>
+          <div key={p.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{p.emoji} {fmtViews(p.views)} views in a month</span><b>{p.label}</b></div>
         ))}
       </div>
     </div>
@@ -960,15 +980,15 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree' }) => {
   const max = () => (track.current?.offsetWidth || 320) - KNOB - 8;
   const finish = () => { setX(max()); setDone(true); onDone(); };
   return (
-    <div ref={track} className="relative h-[72px] rounded-full bg-[var(--elev2)] border border-[var(--border)] overflow-hidden select-none touch-none">
-      <div className="absolute inset-y-0 left-0 bg-[var(--accent-soft)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
+    <div ref={track} className="relative h-[72px] rounded-full bg-[var(--elev2)] border-[2.5px] border-[var(--ink)] overflow-hidden select-none touch-none">
+      <div className="absolute inset-y-0 left-0 bg-[var(--lime)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
       <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
         {done ? "You're in 🤝" : <>{label} <span className="ml-2 slide-hint">→→</span></>}
       </div>
       <button
         type="button"
         aria-label={label}
-        className="absolute top-[7px] left-[4px] w-14 h-14 rounded-full bg-[var(--accent)] text-black flex items-center justify-center shadow-[0_4px_16px_-4px_var(--accent)] cursor-grab active:cursor-grabbing"
+        className="absolute top-[5px] left-[4px] w-14 h-14 rounded-full bg-[var(--ink)] text-[var(--bg)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
         style={{ transform: `translateX(${x}px)`, transition: drag ? 'none' : 'transform .3s' }}
         onPointerDown={(e) => { if (done) return; setDrag(true); startX.current = e.clientX - x; e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { if (drag) setX(Math.max(0, Math.min(max(), e.clientX - startX.current))); }}
@@ -989,10 +1009,9 @@ const RulesGate = ({ user, onAccept }) => {
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6">
-      <div className="w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-[var(--bg)] border border-[var(--border)] anim-fade-up">
+      <div className="stk w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-b-none sm:rounded-[24px] bg-[var(--bg)] pop-in">
         <div className="px-6 pt-6 pb-3">
-          <div className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">Before you start</div>
-          <h2 className="font-display font-extrabold text-3xl tracking-tight mt-1">The rules, {(user.name || '').split(' ')[0] || 'fam'} 📜</h2>
+          <h2 className="font-arcade text-3xl mt-1">The rules, {(user.name || '').split(' ')[0] || 'fam'} 📜</h2>
           <p className="text-sm text-[var(--text-dim)] mt-1">Quick read. Promise it's worth it. 💸</p>
         </div>
         <div className="px-6 overflow-y-auto flex-1">
@@ -1008,6 +1027,75 @@ const RulesGate = ({ user, onAccept }) => {
   );
 };
 
+// ────────────────────────── GAME LAYER ──────────────────────────
+// Weekly pay bands shown as levels.
+const LEVELS = [
+  { name: 'Warming up', emoji: '🌱' },
+  { name: 'Heating up', emoji: '🔥' },
+  { name: 'Going viral', emoji: '🚀' },
+  { name: 'Legend', emoji: '👑' },
+];
+const levelIndex = (views) => {
+  const i = RATE_BANDS.findIndex((b) => views < b.upTo);
+  return i === -1 ? RATE_BANDS.length - 1 : i;
+};
+const bandLabel = (i) => {
+  const b = RATE_BANDS[i];
+  const lo = i === 0 ? 0 : RATE_BANDS[i - 1].upTo;
+  return b.upTo === Infinity ? `${fmtViews(lo)}+` : `${fmtViews(lo)}–${fmtViews(b.upTo)}`;
+};
+const fmtCash = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+// Ticks a number up from 0 once on mount (skipped for reduced motion).
+const useCountUp = (target, ms = 900) => {
+  const [v, setV] = useState(target);
+  const first = useRef(true);
+  useEffect(() => {
+    if (!first.current) { setV(target); return; }
+    first.current = false;
+    if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !target) { setV(target); return; }
+    let raf; const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / ms);
+      setV(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return v;
+};
+
+const Confetti = () => {
+  const bits = ['💸', '🎉', '✨', '🔥', '💚', '🤑'];
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      {Array.from({ length: 18 }).map((_, i) => (
+        <span key={i} className="confetti-bit" style={{ left: `${(i * 53) % 100}%`, animationDelay: `${(i % 6) * 0.08}s`, fontSize: 18 + (i % 3) * 8 }}>
+          {bits[i % bits.length]}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+// Popup after a creator drops a video.
+const DropCelebration = ({ data, onClose }) => (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5" onClick={onClose}>
+    <div className="stk relative overflow-hidden w-full max-w-sm bg-[var(--elev1)] p-7 text-center pop-in" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Video dropped">
+      <Confetti />
+      <div className="relative">
+        <div className="text-6xl">{data.levelUp ? LEVELS[data.level].emoji : '🎉'}</div>
+        <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : 'Dropped!'}</h2>
+        {data.levelUp && <p className="mt-1 font-semibold">You're now <b>{LEVELS[data.level].name}</b> {LEVELS[data.level].emoji}</p>}
+        <div className="mt-5 inline-block stk-chip bg-[var(--lime)] text-black font-arcade text-2xl px-5 py-2">+{fmtCash(data.added)}</div>
+        <p className="mt-3 text-sm text-[var(--text-dim)]">added to this week's bag (pending until we check Monday) 👀</p>
+        <button onClick={onClose} className="stk-btn mt-6 w-full h-14 bg-[var(--ink)] text-[var(--bg)] font-bold text-base">Keep stacking 💪</button>
+      </div>
+    </div>
+  </div>
+);
+
 // ────────────────────────── CREATOR DASHBOARD ──────────────────────────
 const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView }) => {
   const mine = submissions;
@@ -1017,201 +1105,167 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   const lastCall = today === thisWeek; // Sunday: last week's videos can still go in
   const w = computeWeek(subs, thisWeek, true);
   const m = computeMonth(subs, monthStart(today), true);
-  const earned = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const pending = mine.filter((s) => s.status === 'pending').length;
-  const nextTier = VIEW_TIERS.find((t) => t.views > w.views) || null;
-  const progress = nextTier ? Math.min(100, Math.round((w.views / nextTier.views) * 100)) : 100;
-  const monthProgress = m.next ? Math.min(100, Math.round((m.views / m.next.views) * 100)) : 100;
+  const reup = computeReup(subs, today, true);
+  const life = lifetimeViews(subs, undefined, true);
+  const paidTotal = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const lvl = levelIndex(w.views);
+  const band = RATE_BANDS[lvl];
+  const bag = useCountUp(w.pay);
+  const [party, setParty] = useState(null);
   const examples = deal?.examples || [];
   const nf = (n) => Number(n || 0).toLocaleString();
 
+  // segmented progress: each level is one segment, filled by views within it
+  const segFill = (i) => {
+    const lo = i === 0 ? 0 : RATE_BANDS[i - 1].upTo;
+    const hi = RATE_BANDS[i].upTo === Infinity ? CAP_VIEWS : RATE_BANDS[i].upTo;
+    return Math.max(0, Math.min(1, (w.views - lo) / (hi - lo)));
+  };
+
+  const handleDrop = async (data) => {
+    await onSubmit(data);
+    const after = computeWeek([...subs, { posted: data.postedAt, status: 'pending', views: 0, claimedViews: data.claimedViews }], weekStart(data.postedAt), true);
+    const before = computeWeek(subs, weekStart(data.postedAt), true);
+    const newLvl = levelIndex(after.views);
+    setParty({ added: Math.max(0, after.pay - before.pay), level: newLvl, levelUp: newLvl > levelIndex(before.views) });
+  };
+
   return (
-    <div className="space-y-10 md:space-y-12">
-      <div className="relative overflow-hidden rounded-3xl border border-[var(--border)] p-7 md:p-10 anim-fade-up"
-        style={{ background: 'radial-gradient(120% 140% at 100% 0%, var(--accent-soft) 0%, transparent 45%), radial-gradient(120% 160% at 0% 120%, rgba(124,58,237,0.14) 0%, transparent 50%), var(--elev1)' }}>
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
-        <Trophy className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.07] pointer-events-none hidden sm:block" size={150} />
-        <div className="relative">
-          <span className="text-[11px] uppercase tracking-[0.16em] font-bold text-[var(--accent)]">Week of {weekLabel(thisWeek)}</span>
-          <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">
-            Welcome back, {user.name.split(' ')[0]}.
-          </h1>
-          <p className="mt-3 text-[var(--text-dim)] max-w-lg leading-relaxed">
-            {w.total > 0
-              ? <>You're on track for <span className="text-[var(--text)] font-semibold">{fmtMoney(w.total)}</span> this week. Submit every video by <b className="text-[var(--text)]">Saturday 11:59pm</b>.</>
-              : <>Post, then drop your links + views here by <b className="text-[var(--text)]">Saturday 11:59pm</b>. 🎬</>}
-          </p>
-        </div>
+    <div className="max-w-2xl mx-auto space-y-7">
+      {party && <DropCelebration data={party} onClose={() => setParty(null)} />}
+
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <h1 className="font-arcade text-3xl md:text-4xl leading-none">yo {user.name.split(' ')[0]} 👋</h1>
+        <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'bg-[var(--sun)] text-black' : 'bg-[var(--elev1)]'}`}>
+          <span className="mr-1.5">⏰</span>{lastCall ? 'Last call: closes tonight 11:59pm' : 'Submit by Sat 11:59pm'}
+        </span>
       </div>
 
-      {lastCall && (
-        <div className="p-4 md:p-5 rounded-2xl border-2 border-amber-400/60 bg-amber-400/10 text-sm anim-fade-up">
-          ⏰ <b>Last call:</b> today's the last day to submit videos from last week ({weekLabel(addDays(thisWeek, -7))}). Closes tonight 11:59pm.
+      {/* THE BAG — the one big moment */}
+      <section className="stk bg-[var(--lime)] text-black p-6 md:p-8" aria-label="This week's earnings">
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-bold">This week's bag 💰</p>
+          <span className="stk-chip bg-white px-3 py-1 text-sm font-bold whitespace-nowrap"><span className="mr-1.5">{w.capped ? '💎' : LEVELS[lvl].emoji}</span>{w.capped ? 'Maxed out' : LEVELS[lvl].name}</span>
         </div>
-      )}
+        <div className="font-arcade text-[64px] md:text-[88px] leading-[0.95] mt-3 tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
+        <p className="mt-2 font-semibold">{nf(w.views)} views · {w.videos} video{w.videos === 1 ? '' : 's'} this week</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 anim-fade-up anim-d-100">
-        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
-          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a3e635,#4d7c0f)' }}><Wallet size={18} /></span>
-          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(earned)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">Paid to you</div></div>
-        </div>
-        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
-          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: 'linear-gradient(135deg,#a78bfa,#6d28d9)' }}><Clock size={18} /></span>
-          <div><div className="font-display font-bold text-2xl leading-none">{fmtMoney(w.total)}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">This week (estimate)</div></div>
-        </div>
-        <div className="flex items-center gap-3.5 p-4 md:p-5 rounded-2xl bg-[var(--elev1)] border border-[var(--border)]">
-          <span className="w-11 h-11 rounded-xl flex items-center justify-center text-black flex-shrink-0" style={{ background: 'linear-gradient(135deg,#fcd34d,#d97706)' }}><Inbox size={18} /></span>
-          <div><div className="font-display font-bold text-2xl leading-none">{pending}</div><div className="text-xs text-[var(--text-dim)] mt-1 font-semibold">In review</div></div>
-        </div>
-      </div>
-
-      {/* ── THIS WEEK ── */}
-      <div className="anim-fade-up anim-d-200">
-        <Card className="relative overflow-hidden p-7 md:p-10">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full glow-accent pointer-events-none" />
-          <div className="relative">
-            <Badge status="active">This week</Badge>
-            <div className="mt-6 grid grid-cols-3 gap-4 max-w-lg">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Views</div>
-                <div className="font-display font-bold text-3xl md:text-4xl text-[var(--accent)]">{nf(w.views)}</div>
+        <div className="mt-5 grid grid-cols-4 gap-1.5" role="img" aria-label={`Level ${lvl + 1} of 4`}>
+          {RATE_BANDS.map((_, i) => (
+            <div key={i}>
+              <div className="h-4 rounded-full border-2 border-black bg-white/60 overflow-hidden">
+                <div className="h-full bg-black rounded-full transition-[width] duration-700" style={{ width: `${segFill(i) * 100}%` }} />
               </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Videos</div>
-                <div className="font-display font-bold text-3xl md:text-4xl">{w.videos}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--text-dim)] mb-1.5">Days posted</div>
-                <div className="font-display font-bold text-3xl md:text-4xl">{w.days}</div>
-              </div>
+              <div className="text-[11px] font-bold mt-1.5 leading-tight"><span className="block text-base">{LEVELS[i].emoji}</span>{bandLabel(i)}</div>
             </div>
+          ))}
+        </div>
 
-            <div className="mt-7">
-              {w.viewTier && (
-                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--accent)] text-black font-bold text-sm mb-4">
-                  <Check size={15} strokeWidth={3} /> {w.viewTier.label} unlocked
-                </div>
-              )}
-              {nextTier ? (
-                <>
-                  <div className="text-lg md:text-xl font-semibold">
-                    {nf(nextTier.views - w.views)} more views to unlock <span className="text-[var(--accent)]">{nextTier.label}</span>
-                  </div>
-                  <div className="mt-4 h-3 rounded-full bg-[var(--elev2)] overflow-hidden">
-                    <div className="h-full bg-[var(--accent)] rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
-                  </div>
-                </>
-              ) : (
-                <div className="text-lg md:text-xl font-bold text-[var(--accent)]">🎉 Top view tier this week. Incredible.</div>
-              )}
-              <p className="text-xs text-[var(--text-faint)] mt-3">Estimate based on the views you entered. Final numbers after we verify on Monday.</p>
-            </div>
+        <p className="mt-4 text-sm font-semibold">
+          {w.capped
+            ? `You hit the ${fmtCash(WEEKLY_CAP)} max this week. Absolute legend 👑`
+            : `Every 10K views right now = +${fmtCash(band.per10k)} 💸`}
+        </p>
+        <p className="mt-1 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
+      </section>
+
+      <a href="#drop" className="stk-btn flex items-center justify-center gap-2 h-16 bg-[var(--ink)] text-[var(--bg)] font-arcade text-xl"><span>📲</span><span>Drop a video</span></a>
+
+      {/* side quests */}
+      <section aria-label="Bonuses">
+        <h2 className="font-arcade text-xl mb-3">Side quests</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="stk bg-[var(--elev1)] p-5">
+            <div className="text-3xl">🎁</div>
+            <div className="font-bold mt-2">Free re-up</div>
+            <div className="text-sm text-[var(--text-dim)]">Post {REUP_VIDEOS} videos by {fmtDay(reup.end)}</div>
+            <div className="font-arcade text-2xl mt-3">{Math.min(reup.videos, REUP_VIDEOS)}<span className="text-[var(--text-dim)] text-base">/{REUP_VIDEOS}</span></div>
+            <div className="mt-2 flex gap-1">{Array.from({ length: REUP_VIDEOS }).map((_, i) => <span key={i} className={`h-2.5 flex-1 rounded-full border-2 border-[var(--ink)] ${i < reup.videos ? 'bg-[var(--grape)]' : ''}`} />)}</div>
           </div>
-        </Card>
+          <div className="stk bg-[var(--elev1)] p-5">
+            <div className="text-3xl">😎</div>
+            <div className="font-bold mt-2">Logo pfp</div>
+            <div className="text-sm text-[var(--text-dim)]">Make the Mad Labs logo your profile pic</div>
+            <div className="font-arcade text-2xl mt-3">+{fmtCash(LOGO_PFP_BONUS)}<span className="text-[var(--text-dim)] text-base">/week</span></div>
+          </div>
+          <div className="stk bg-[var(--elev1)] p-5">
+            <div className="text-3xl">🤑</div>
+            <div className="font-bold mt-2">Paid to you</div>
+            <div className="text-sm text-[var(--text-dim)]">All-time, straight to your Cash App</div>
+            <div className="font-arcade text-2xl mt-3">{fmtCash(paidTotal)}</div>
+          </div>
+        </div>
+      </section>
 
-        {/* view ladder */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
-          {VIEW_TIERS.map((t) => {
-            const hit = w.views >= t.views;
-            const isNext = nextTier?.views === t.views;
+      {/* merch unlocks */}
+      <section aria-label="Free merch">
+        <h2 className="font-arcade text-xl mb-1">Free merch drops</h2>
+        <p className="text-sm text-[var(--text-dim)] mb-3">Unlocks with your total views. You're at {nf(life)}.</p>
+        <div className="grid grid-cols-2 gap-3">
+          {MILESTONES.map((ms) => {
+            const got = life >= ms.views;
             return (
-              <div key={t.views}
-                className={`reward-step p-4 md:p-5 rounded-2xl border transition-all duration-300 ${hit ? 'border-[var(--accent)] shadow-[0_8px_30px_-12px_var(--accent)]' : isNext ? 'border-[var(--accent)]/40 bg-[var(--elev1)]' : 'border-[var(--border)] bg-[var(--elev1)] opacity-60'}`}
-                style={hit ? { background: 'linear-gradient(135deg, var(--accent-soft), transparent)' } : undefined}>
-                <div className="flex items-center justify-between">
-                  <span className="font-display font-bold text-xl md:text-2xl">{t.label}</span>
-                  {hit ? <Check size={18} strokeWidth={3} className="text-[var(--accent)]" /> : <Lock size={14} className="text-[var(--text-faint)]" />}
-                </div>
-                <div className="text-sm text-[var(--text-dim)] mt-0.5">{fmtViews(t.views)} views</div>
+              <div key={ms.views} className={`stk p-5 text-center ${got ? 'bg-[var(--lime)] text-black' : 'bg-[var(--elev1)]'}`}>
+                <div className={`text-5xl ${got ? '' : 'grayscale opacity-60'}`}>{ms.emoji}</div>
+                <div className="font-bold mt-2">{ms.label}</div>
+                <div className={`text-sm mt-0.5 ${got ? 'font-bold' : 'text-[var(--text-dim)]'}`}>{got ? 'Unlocked ✓' : `${fmtViews(ms.views - life)} views to go`}</div>
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* ── BONUSES ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up anim-d-200">
-        <Card className="p-6 md:p-7">
-          <h3 className="font-display font-bold text-xl tracking-tight">🔥 Posting bonus</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-1">Stacks on top of your view reward. Post on different days.</p>
-          <div className="mt-5 space-y-4">
-            {POSTING_BONUSES.map((b) => {
-              const hit = w.videos >= b.videos && w.days >= b.days;
-              return (
-                <div key={b.videos}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">{b.videos}+ videos · {b.days === 7 ? 'all 7' : `${b.days}+`} days</span>
-                    <span className={hit ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-dim)]'}>{hit ? '✓ ' : ''}{b.label}</span>
-                  </div>
-                  <div className="text-xs text-[var(--text-dim)] mt-1">{Math.min(w.videos, b.videos)}/{b.videos} videos · {Math.min(w.days, b.days)}/{b.days} days</div>
-                  <div className="mt-2 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
-                    <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${Math.round(((Math.min(w.videos, b.videos) / b.videos) + (Math.min(w.days, b.days) / b.days)) * 50)}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            <div className="pt-3 border-t border-[var(--border)] flex items-center justify-between text-sm">
-              <span>😎 Mad Labs logo as your pfp</span>
-              <span className="font-bold text-[var(--accent)]">+{fmtMoney(LOGO_PFP_BONUS)}/week</span>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 md:p-7">
-          <h3 className="font-display font-bold text-xl tracking-tight">🏆 {monthLabel(monthStart(today))} big prize</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-1">{MONTHLY_PRIZES.map((p) => `${fmtViews(p.views)} → ${p.label}`).join(' · ')}</p>
-          <div className="mt-5 font-display font-bold text-3xl text-[var(--accent)]">{nf(m.views)} <span className="text-base text-[var(--text-dim)] font-semibold">views this month</span></div>
-          {m.prize && <div className="inline-flex mt-3 px-3 py-1.5 rounded-full bg-[var(--accent)] text-black font-bold text-sm">🎉 {m.prize.label} unlocked</div>}
-          {m.next && (
-            <>
-              <div className="mt-3 text-sm font-semibold">{nf(m.next.views - m.views)} more to win <span className="text-[var(--accent)]">{m.next.label}</span></div>
-              <div className="mt-3 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
-                <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${monthProgress}%` }} />
+      {/* big prizes */}
+      <section aria-label="Monthly prizes">
+        <h2 className="font-arcade text-xl mb-1">The big ones 🏆</h2>
+        <p className="text-sm text-[var(--text-dim)] mb-3">Hit these in one month ({monthLabel(monthStart(today))}). You're at {nf(m.views)}.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {MONTHLY_PRIZES.map((p, i) => {
+            const pct = Math.min(100, Math.round((m.views / p.views) * 100));
+            const won = m.views >= p.views;
+            return (
+              <div key={p.views} className={`stk p-6 text-white ${i === 0 ? 'bg-[var(--grape)] tilt-l' : 'bg-[var(--gum)] tilt-r'}`}>
+                <div className="text-5xl">{p.emoji}</div>
+                <div className="font-arcade text-xl mt-3 leading-tight">{p.label}</div>
+                <div className="text-sm mt-1 font-semibold opacity-90">{fmtViews(p.views)} views in a month</div>
+                <div className="mt-4 h-3 rounded-full bg-black/25 overflow-hidden"><div className="h-full bg-white rounded-full" style={{ width: `${pct}%` }} /></div>
+                <div className="text-xs font-bold mt-1.5">{won ? 'WON 🎉 we\'ll hit you up' : `${pct}% there`}</div>
               </div>
-            </>
-          )}
-        </Card>
-      </div>
+            );
+          })}
+        </div>
+      </section>
 
-      <SubmitForm user={user} onSubmit={onSubmit} />
+      <div id="drop" className="scroll-mt-24"><SubmitForm user={user} onSubmit={handleDrop} /></div>
 
-      {/* ── EXAMPLE VIDEOS ── */}
       {examples.length > 0 && (
-        <div className="anim-fade-up anim-d-300">
-          <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight mb-5">Example videos</h3>
+        <section aria-label="Example videos">
+          <h2 className="font-arcade text-xl mb-3">Need ideas? 💡</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {examples.map((x, i) => (
-              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer"
-                className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-[var(--border)] bg-[var(--elev2)] hover:border-[var(--border-strong)]">
-                <div className="flex items-center gap-3 min-w-0">
-                  <PlatformIcon platform={detectPlatform(x)} />
-                  <span className="text-sm truncate">{x}</span>
-                </div>
-                <ExternalLink size={15} className="text-[var(--text-dim)] flex-shrink-0" />
+              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer" className="stk-chip flex items-center justify-between gap-3 p-4 bg-[var(--elev1)]">
+                <span className="flex items-center gap-3 min-w-0"><PlatformIcon platform={detectPlatform(x)} /><span className="text-sm truncate">{x}</span></span>
+                <ExternalLink size={15} className="flex-shrink-0" />
               </a>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="anim-fade-up anim-d-400">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight">Recent submissions</h3>
-          <button onClick={() => setView('history')} className="text-sm font-semibold text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1">
-            See all <ChevronRight size={14} />
-          </button>
+      <section aria-label="Recent videos">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-arcade text-xl">Your drops</h2>
+          <button onClick={() => setView('history')} className="text-sm font-bold underline underline-offset-4">See all</button>
         </div>
         {mine.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Inbox size={28} className="mx-auto text-[var(--text-faint)] mb-3" />
-            <p className="text-sm text-[var(--text-dim)]">No submissions yet. Drop your first link above.</p>
-          </Card>
-        ) : (
-          <div className="space-y-2.5">
-            {mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} />)}
+          <div className="stk p-8 text-center bg-[var(--elev1)]">
+            <div className="text-4xl">🎬</div>
+            <p className="mt-2 font-semibold">Nothing yet. Drop your first video above and start stacking.</p>
           </div>
+        ) : (
+          <div className="space-y-2.5">{mine.slice(0, 3).map((s) => <SubmissionRow key={s.id} sub={s} />)}</div>
         )}
-      </div>
+      </section>
     </div>
   );
 };
@@ -1248,15 +1302,10 @@ const SubmitForm = ({ user, onSubmit }) => {
   };
 
   return (
-    <Card className="p-6 md:p-8 anim-fade-up anim-d-300">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center shadow-[0_4px_16px_-4px_var(--accent)]">
-          <Upload size={16} strokeWidth={2.4} className="text-black" />
-        </div>
-        <div>
-          <h3 className="font-display font-bold text-xl tracking-tight">Submit a video</h3>
-          <p className="text-xs text-[var(--text-dim)] mt-0.5">One video at a time: link, date posted, and its views right now</p>
-        </div>
+    <div className="stk bg-[var(--elev1)] p-6 md:p-8">
+      <div className="mb-6">
+        <h2 className="font-arcade text-2xl"><span className="mr-2">📲</span>Drop a video</h2>
+        <p className="text-sm text-[var(--text-dim)] mt-1">One at a time: the link, the day you posted it, and its views right now.</p>
       </div>
 
       <form onSubmit={submit} className="space-y-6">
@@ -1269,7 +1318,7 @@ const SubmitForm = ({ user, onSubmit }) => {
                 type="button"
                 key={p.id}
                 onClick={() => setPlatform(p.id)}
-                className={`flex items-center justify-center gap-2 h-12 rounded-2xl border font-semibold text-sm transition-all ${platform === p.id ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]' : 'border-[var(--border)] bg-[var(--elev1)] text-[var(--text-dim)] hover:border-[var(--border-strong)]'}`}
+                className={`flex items-center justify-center gap-2 h-12 stk-chip font-bold text-sm transition-colors ${platform === p.id ? 'bg-[var(--lime)] text-black' : 'bg-[var(--elev1)] text-[var(--text-dim)]'}`}
               >
                 <PlatformIcon platform={p.id} />{p.label}
               </button>
@@ -1298,9 +1347,6 @@ const SubmitForm = ({ user, onSubmit }) => {
               onChange={(e) => setPostedAt(e.target.value)}
               className="w-full h-12 px-4 rounded-2xl bg-[var(--elev1)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)] transition-all"
             />
-            <p className="text-[11px] text-[var(--text-faint)] mt-2 leading-snug">
-              All data is verified. Submitting false info means losing access to the program.
-            </p>
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-dim)] mb-2.5">Views on this video</label>
@@ -1325,22 +1371,22 @@ const SubmitForm = ({ user, onSubmit }) => {
           🚫 Your video has to <b className="text-[var(--text)]">still be up when we check on Monday</b> — TikTok & IG take down cannabis content a lot, and removed videos don't count. 🏷️ MAD LABS must be clearly visible.
         </p>
 
-        <div className="flex items-center justify-end gap-3 pt-1">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
           {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
-          {success && <span className="text-xs text-[var(--success)] flex items-center gap-1.5 font-semibold"><Check size={13} strokeWidth={3} />Submitted for review</span>}
-          <Btn type="submit" disabled={!ready || submitting} iconRight={ArrowRight}>{submitting ? 'Submitting…' : 'Submit for review'}</Btn>
+          
+          <button type="submit" disabled={!ready || submitting} className="stk-btn h-14 px-6 w-full sm:w-auto bg-[var(--ink)] text-[var(--bg)] font-arcade text-lg disabled:opacity-40 disabled:pointer-events-none">{submitting ? 'Dropping…' : 'Drop it 🚀'}</button>
         </div>
       </form>
-    </Card>
+    </div>
   );
 };
 
 const SubmissionRow = ({ sub }) => {
   const verified = sub.status === 'approved' || sub.status === 'paid';
   return (
-    <Card interactive className="p-4 md:p-5">
+    <div className="border-2 border-[var(--ink)] rounded-[20px] bg-[var(--elev1)] p-4 md:p-5">
       <div className="flex items-start gap-4">
-        <div className="w-11 h-11 rounded-2xl bg-[var(--elev2)] flex items-center justify-center flex-shrink-0">
+        <div className="w-11 h-11 rounded-full bg-[var(--elev2)] border-2 border-[var(--ink)] flex items-center justify-center flex-shrink-0">
           <PlatformIcon platform={sub.platform} size={16} />
         </div>
         <div className="flex-1 min-w-0">
@@ -1359,20 +1405,19 @@ const SubmissionRow = ({ sub }) => {
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
 const CreatorRewards = () => (
   <div className="space-y-8 md:space-y-10">
     <div className="anim-fade-up">
-      <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">How it works</span>
-      <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Rewards & rules</h1>
+      <h1 className="font-arcade text-4xl md:text-5xl mt-2">The rules 📜</h1>
       <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place. 📌</p>
     </div>
-    <Card className="p-6 md:p-8 anim-fade-up anim-d-100 max-w-2xl">
+    <div className="stk bg-[var(--elev1)] p-6 md:p-8 max-w-2xl">
       <RulesContent />
-    </Card>
+    </div>
   </div>
 );
 
@@ -1384,9 +1429,8 @@ const CreatorHistory = ({ submissions }) => {
   return (
     <div className="space-y-8 md:space-y-10">
       <div className="anim-fade-up">
-        <span className="text-xs uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">Your activity</span>
-        <h1 className="font-display font-extrabold text-4xl md:text-5xl mt-2 tracking-tight">Submissions</h1>
-        <p className="mt-3 text-[var(--text-dim)]">All links you've submitted, and where they stand.</p>
+        <h1 className="font-arcade text-4xl md:text-5xl">Your drops 🎬</h1>
+        <p className="mt-3 text-[var(--text-dim)]">Every video you've submitted and where it's at.</p>
       </div>
 
       <div className="flex gap-1 p-1 rounded-full bg-[var(--elev1)] border border-[var(--border)] overflow-x-auto no-scrollbar anim-fade-up anim-d-100">

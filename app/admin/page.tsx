@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import {
-  VIEW_TIERS, POSTING_BONUSES, MONTHLY_PRIZES, LOGO_PFP_BONUS,
-  computeWeek, computeMonth, lastClosedWeek, weekStart, monthStart, addDays,
+  RATE_BANDS, WEEKLY_CAP, CAP_VIEWS, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
+  computeWeek, computeMonth, computeReup, lifetimeViews, milestonesReached, payForViews, lastClosedWeek, weekStart, monthStart, addDays,
   weekLabel, monthLabel, todayLocal, type SubLike,
 } from '@/lib/rewards'
 
@@ -267,10 +267,18 @@ export default function AdminPage() {
   const subsBy = (cid: string) => submissions.filter((s) => s.creator_id === cid).map(toSubLike)
   const paidRow = (cid: string, period: 'week' | 'month', start: string) =>
     payouts.find((p) => p.creator_id === cid && p.period === period && p.period_start === start)
+  // merch already handed out (recorded on earlier weekly payouts)
+  const given = (cid: string, key: string) =>
+    payouts.some((p) => p.creator_id === cid && p.period_start !== payWeek && (p.details?.[key] === true || (p.details?.milestones || []).includes(key)))
   const weekRows = creators.map((c) => {
-    const w = computeWeek(subsBy(c.id), payWeek)
+    const subs = subsBy(c.id)
+    const w = computeWeek(subs, payWeek)
     const logo = !!pfp[c.id + payWeek]
-    return { c, w, logo, total: w.total + (logo && w.videos > 0 ? LOGO_PFP_BONUS : 0), paid: paidRow(c.id, 'week', payWeek) }
+    const r = computeReup(subs, payWeek)
+    // re-up is handed out on the 2nd week of each 2-week period
+    const reup = r.earned && addDays(r.start, 7) === payWeek && !given(c.id, 'reup_' + r.start)
+    const merch = milestonesReached(lifetimeViews(subs, addDays(payWeek, 6))).filter((m) => !given(c.id, m.label))
+    return { c, w, logo, reup, reupKey: 'reup_' + r.start, merch, total: w.pay + (logo && w.videos > 0 ? LOGO_PFP_BONUS : 0), paid: paidRow(c.id, 'week', payWeek) }
   }).filter((r) => r.w.videos > 0 || r.w.pending > 0 || r.paid)
   const weekTotal = weekRows.reduce((a, r) => a + (r.paid ? Number(r.paid.amount) : r.total), 0)
   const weekPendingVideos = weekRows.reduce((a, r) => a + r.w.pending, 0)
@@ -279,7 +287,7 @@ export default function AdminPage() {
 
   const paidOut = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0)
   const lastWeek = lastClosedWeek()
-  const owed = creators.reduce((a, c) => paidRow(c.id, 'week', lastWeek) ? a : a + computeWeek(subsBy(c.id), lastWeek).total, 0)
+  const owed = creators.reduce((a, c) => paidRow(c.id, 'week', lastWeek) ? a : a + computeWeek(subsBy(c.id), lastWeek).pay, 0)
 
   const subsShown = subWeek === 'all' ? submissions : submissions.filter((s) => weekStart(posted(s)) === subWeek)
   const weekOptions = Array.from(new Set(submissions.map((s) => weekStart(posted(s))).filter(Boolean))).sort().reverse()
@@ -450,15 +458,23 @@ export default function AdminPage() {
               <p className="muted" style={{ marginTop: 4 }}>These numbers live in <code>lib/rewards.ts</code>. Creators see the same ones.</p>
               <div className="rules-grid">
                 <div>
-                  <div className="flabel">Weekly views (highest tier only)</div>
-                  {VIEW_TIERS.map((t) => <div key={t.views} className="rule-row"><span>{num(t.views)} views</span><b>{t.label}</b></div>)}
+                  <div className="flabel">Weekly pay (each band at its own rate)</div>
+                  {RATE_BANDS.map((b, i) => (
+                    <div key={i} className="rule-row">
+                      <span>{i === 0 ? `First ${num(b.upTo)}` : b.upTo === Infinity ? `Over ${num(RATE_BANDS[i - 1].upTo)}` : `${num(RATE_BANDS[i - 1].upTo)} → ${num(b.upTo)}`} views</span>
+                      <b>${b.per10k} per 10K</b>
+                    </div>
+                  ))}
+                  <div className="rule-row"><span>Weekly cap (hit at {num(CAP_VIEWS)} views)</span><b>{money(WEEKLY_CAP)}</b></div>
+                  {[100_000, 500_000, 1_000_000].map((v) => <div key={v} className="rule-row"><span>e.g. {num(v)} views</span><b>{money(payForViews(v))}</b></div>)}
                 </div>
                 <div>
-                  <div className="flabel">Posting bonus (stacks)</div>
-                  {POSTING_BONUSES.map((b) => <div key={b.videos} className="rule-row"><span>{b.videos}+ videos on {b.days === 7 ? 'all 7' : `${b.days}+`} days</span><b>{b.label}</b></div>)}
+                  <div className="flabel">Extras</div>
                   <div className="rule-row"><span>Mad Labs logo as profile pic</span><b>+{money(LOGO_PFP_BONUS)}/week</b></div>
+                  <div className="rule-row"><span>{REUP_VIDEOS} videos in a 2-week period</span><b>Product re-up</b></div>
+                  {MILESTONES.map((m) => <div key={m.views} className="rule-row"><span>{num(m.views)} total views</span><b>{m.emoji} {m.label}</b></div>)}
                   <div className="flabel" style={{ marginTop: 16 }}>Monthly prizes</div>
-                  {MONTHLY_PRIZES.map((p) => <div key={p.views} className="rule-row"><span>{num(p.views)} views in a month</span><b>{p.label}</b></div>)}
+                  {MONTHLY_PRIZES.map((p) => <div key={p.views} className="rule-row"><span>{num(p.views)} views in a month</span><b>{p.emoji} {p.label}</b></div>)}
                 </div>
               </div>
             </div>
@@ -501,7 +517,7 @@ export default function AdminPage() {
                 <div>
                   <div className="card-h">Week of {weekLabel(payWeek)}</div>
                   <div className="muted" style={{ marginTop: 4 }}>
-                    Only verified (approved) views count. Total this week: <b style={{ color: 'var(--text)' }}>{money(weekTotal)}</b>
+                    Only verified (approved) views count. "Also send" = product to ship. Total this week: <b style={{ color: 'var(--text)' }}>{money(weekTotal)}</b>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -520,21 +536,24 @@ export default function AdminPage() {
             <div className="card table-scroll" style={{ marginBottom: 24 }}>
               <table className="tbl">
                 <thead><tr>
-                  <th>Creator</th><th>Videos</th><th>Days</th><th>Verified views</th><th>View reward</th><th>Posting bonus</th><th>Logo pfp</th><th>Total</th><th>Cash App</th><th></th>
+                  <th>Creator</th><th>Videos</th><th>Verified views</th><th>View pay</th><th>Logo pfp</th><th>Also send</th><th>Total</th><th>Cash App</th><th></th>
                 </tr></thead>
                 <tbody>
-                  {weekRows.map(({ c, w, logo, total, paid }) => (
+                  {weekRows.map(({ c, w, logo, reup, reupKey, merch, total, paid }) => (
                     <tr key={c.id}>
                       <td style={{ fontWeight: 600 }}>{c.name}{w.pending > 0 && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{w.pending} pending</div>}</td>
                       <td>{w.videos}</td>
-                      <td>{w.days}</td>
                       <td>{num(w.views)}</td>
-                      <td>{w.viewTier ? w.viewTier.label : <span className="muted">—</span>}</td>
-                      <td>{w.bonus ? w.bonus.label : <span className="muted">—</span>}</td>
+                      <td>{money(w.pay)}{w.capped && <div className="muted" style={{ fontSize: 12 }}>capped</div>}</td>
                       <td>
                         {paid
                           ? (paid.details?.logo_pfp ? '✓' : <span className="muted">—</span>)
                           : <input type="checkbox" className="chk" checked={logo} onChange={(e) => setPfp((p) => ({ ...p, [c.id + payWeek]: e.target.checked }))} title={`+${money(LOGO_PFP_BONUS)} if their profile pic is the Mad Labs logo`} />}
+                      </td>
+                      <td>
+                        {paid
+                          ? ([paid.details?.[reupKey] && '🎁 Re-up', ...(paid.details?.milestones || [])].filter(Boolean).join(', ') || <span className="muted">—</span>)
+                          : ([reup && '🎁 Re-up', ...merch.map((m) => `${m.emoji} ${m.label}`)].filter(Boolean).join(', ') || <span className="muted">—</span>)}
                       </td>
                       <td style={{ fontWeight: 700 }}>{money(paid ? Number(paid.amount) : total)}</td>
                       <td>{c.cashapp || <span className="muted">—</span>}</td>
@@ -553,8 +572,8 @@ export default function AdminPage() {
                               if (!confirm(`Mark ${c.name} paid ${money(total)} for ${weekLabel(payWeek)}?`)) return
                               markPaid({
                                 creator_id: c.id, period: 'week', period_start: payWeek, amount: total,
-                                label: [w.viewTier?.label, w.bonus?.label, logo && `logo +${money(LOGO_PFP_BONUS)}`].filter(Boolean).join(' + ') || '$0',
-                                details: { views: w.views, videos: w.videos, days: w.days, view_reward: w.viewTier?.amount || 0, bonus: w.bonus?.amount || 0, logo_pfp: logo },
+                                label: [`views ${money(w.pay)}`, logo && `logo +${money(LOGO_PFP_BONUS)}`, reup && 're-up', ...merch.map((m) => m.label)].filter(Boolean).join(' + '),
+                                details: { views: w.views, videos: w.videos, view_pay: w.pay, logo_pfp: logo, [reupKey]: reup, milestones: merch.map((m) => m.label) },
                               })
                             }}
                           >Mark paid</button>
@@ -562,7 +581,7 @@ export default function AdminPage() {
                       </td>
                     </tr>
                   ))}
-                  {weekRows.length === 0 && <tr><td className="empty" colSpan={10}>No videos posted this week.</td></tr>}
+                  {weekRows.length === 0 && <tr><td className="empty" colSpan={9}>No videos posted this week.</td></tr>}
                 </tbody>
               </table>
             </div>
