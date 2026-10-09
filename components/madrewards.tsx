@@ -272,12 +272,15 @@ const ThemeStyles = () => (
     .font-arcade { font-family: 'Fredoka', 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
     .stk { background-color: var(--card); border: 1px solid var(--card-line); border-radius: 28px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 14px 32px -18px rgba(76,60,160,.28); }
     .stk-chip { border: 1px solid var(--card-line); border-radius: 999px; }
-    .stk-btn { border-radius: 999px; background: linear-gradient(135deg, #B8F53A, #3DDC84); color: #08210f !important; box-shadow: 0 10px 24px -8px rgba(61,220,132,.65), inset 0 1px 0 rgba(255,255,255,.5); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
-    .stk-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(61,220,132,.75), inset 0 1px 0 rgba(255,255,255,.5); }
+    .stk-btn { border-radius: 999px; background: linear-gradient(135deg, #4F8BFF, #1D4FE0); color: #fff !important; box-shadow: 0 10px 24px -8px rgba(29,79,224,.55), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+    .stk-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(29,79,224,.65), inset 0 1px 0 rgba(255,255,255,.35); }
     .stk-btn:active { transform: translateY(1px) scale(.98); }
     .stk-btn:focus-visible, .stk-chip:focus-visible, .pill-btn:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
     .gloss { position: relative; overflow: hidden; }
     .gloss::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 42%); pointer-events: none; border-radius: inherit; }
+    .g-blue  { background: linear-gradient(135deg, #5BA8FF 0%, #2F6BFF 45%, #1D3FD1 100%); }
+    .g-level { background: radial-gradient(120% 90% at 85% 15%, rgba(173,224,255,.75) 0%, rgba(173,224,255,0) 45%), linear-gradient(135deg, #3E8BFF 0%, #1F5BF0 50%, #1736B8 100%); }
+    .ok-pill { background: #E3F7EC; color: #16794A; }
     .g-lime  { background: linear-gradient(135deg, #D7FF5C 0%, #7EE34B 55%, #23C483 100%); }
     .g-grape { background: linear-gradient(135deg, #A78BFA 0%, #7B5CFF 50%, #5B3DF5 100%); }
     .g-gum   { background: linear-gradient(135deg, #FF9AD5 0%, #FF4FB8 55%, #E0338F 100%); }
@@ -939,7 +942,7 @@ const Watermark = ({ user }) => {
     <div
       aria-hidden
       className="fixed inset-0 z-[60] pointer-events-none select-none"
-      style={{ backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`, opacity: 0.09 }}
+      style={{ backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`, opacity: 0.035 }}
     />
   );
 };
@@ -1013,7 +1016,7 @@ const RulesContent = () => (
         <li>5️⃣ Cash hits your Cash App 🤑</li>
       </ol>
 
-      <div className="gloss g-lime rounded-[24px] p-4 text-[#08210f]">
+      <div className="gloss g-level rounded-[24px] p-4 text-white">
         <div className="text-xs font-bold opacity-80">This week's rate</div>
         <div className="font-arcade text-xl">{fmtCash(PAY_PER_100K)} for every 100K views</div>
         <p className="mt-1">250K = {fmtCash(payForViews(250_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))}</p>
@@ -1090,7 +1093,7 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
   const finish = () => { setX(max()); setDone(true); onDone(); };
   return (
     <div ref={track} className="relative h-[68px] rounded-full bg-[var(--elev2)] overflow-hidden select-none touch-none">
-      <div className="absolute inset-y-0 left-0 bg-[var(--lime)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
+      <div className="absolute inset-y-0 left-0 bg-[#2F6BFF]/20" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
       <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
         {done ? "You're in 🤝" : locked ? '🔒 Scroll to the end to unlock' : <>{label} <span className="ml-2 slide-hint">→→</span></>}
       </div>
@@ -1098,7 +1101,7 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
         type="button"
         aria-label={label}
         disabled={locked}
-        className="absolute top-[6px] left-[6px] w-14 h-14 rounded-full disabled:opacity-30 g-lime text-[#08210f] shadow-[0_6px_16px_-6px_rgba(35,196,131,.8)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
+        className="absolute top-[6px] left-[6px] w-14 h-14 rounded-full disabled:opacity-30 g-blue text-white shadow-[0_6px_16px_-6px_rgba(29,79,224,.8)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
         style={{ transform: `translateX(${x}px)`, transition: drag ? 'none' : 'transform .3s' }}
         onPointerDown={(e) => { if (done) return; setDrag(true); startX.current = e.clientX - x; e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { if (drag) setX(Math.max(0, Math.min(max(), e.clientX - startX.current))); }}
@@ -1189,7 +1192,7 @@ const DropCelebration = ({ data, onClose }) => (
         <div className="text-6xl">{data.levelUp ? LEVELS[data.level].emoji : '🎉'}</div>
         <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : data.count > 1 ? `${data.count} videos dropped!` : 'Dropped!'}</h2>
         {data.levelUp && <p className="mt-1 font-semibold">You're now <b>{LEVELS[data.level].name}</b> {LEVELS[data.level].emoji}</p>}
-        <div className="mt-5 inline-block rounded-full g-lime text-[#08210f] font-arcade text-2xl px-5 py-2 border-0">+{fmtCash(data.added)}</div>
+        <div className="mt-5 inline-block rounded-full g-blue text-white font-arcade text-2xl px-5 py-2 border-0">+{fmtCash(data.added)}</div>
         <p className="mt-3 text-sm text-[var(--text-dim)]">added to this week's bag (pending until we check Monday) 👀</p>
         <button onClick={onClose} className="stk-btn mt-6 w-full h-14 font-bold text-base">Keep stacking 💪</button>
       </div>
@@ -1250,10 +1253,10 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       </div>
 
       {/* LEVEL CARD — the one big moment */}
-      <section className="gloss g-lime rounded-[32px] p-6 md:p-8 text-[#08210f] shadow-[0_24px_48px_-20px_rgba(35,196,131,.7)]" aria-label="This week">
+      <section className="gloss g-level rounded-[32px] p-6 md:p-8 text-white shadow-[0_24px_48px_-20px_rgba(31,91,240,.6)]" aria-label="This week">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <span className="inline-block rounded-full bg-white/70 px-3 py-1 text-xs font-bold">This week's level</span>
+            <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-bold">This week's level</span>
             <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none">{LEVELS[lvl].name}</div>
             <div className="mt-4 text-sm font-semibold opacity-80">Your bag so far</div>
             <div className="font-arcade text-6xl md:text-7xl leading-none tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
@@ -1263,10 +1266,10 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
         <div className="mt-6">
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-4 rounded-full bg-white/50 overflow-hidden">
-              <div className="h-full rounded-full bg-[#08210f] transition-[width] duration-700" style={{ width: `${lvlPct}%` }} />
+            <div className="flex-1 h-4 rounded-full bg-white/25 overflow-hidden">
+              <div className="h-full rounded-full bg-white transition-[width] duration-700" style={{ width: `${lvlPct}%` }} />
             </div>
-            <span className="w-11 h-11 rounded-full bg-white grid place-items-center text-xl shadow" aria-hidden>{nextLvl ? '🔒' : '👑'}</span>
+            <span className="w-11 h-11 rounded-full bg-white/95 border-2 border-white grid place-items-center text-xl shadow-[0_0_0_4px_rgba(255,255,255,.25)]" aria-hidden>{nextLvl ? '🔒' : '👑'}</span>
           </div>
           <p className="mt-2 text-sm font-semibold">
             {nextLvl
@@ -1276,23 +1279,23 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold">
-          <span className="rounded-full bg-white/70 px-3 py-1.5">👀 {nf(w.views)} views</span>
-          <span className="rounded-full bg-white/70 px-3 py-1.5">🎬 {w.videos} video{w.videos === 1 ? '' : 's'}</span>
-          <span className="rounded-full bg-white/70 px-3 py-1.5">💸 This week: {fmtCash(PAY_PER_100K)} per 100K</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">👀 {nf(w.views)} views</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">🎬 {w.videos} video{w.videos === 1 ? '' : 's'}</span>
+          <span className="rounded-full bg-white/20 px-3 py-1.5">💸 This week: {fmtCash(PAY_PER_100K)} per 100K</span>
         </div>
         <p className="mt-3 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button onClick={() => setView('drop')} className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>📲</span><span>Drop your videos</span></button>
-        <button onClick={() => setView('ideas')} className="flex items-center justify-center gap-2 h-16 rounded-full g-grape gloss text-white font-arcade text-lg shadow-[0_10px_24px_-10px_rgba(91,61,245,.7)]"><span>💡</span><span>Examples of videos that hit</span></button>
+        <button onClick={() => setView('ideas')} className="flex items-center justify-center gap-2 h-16 rounded-full bg-[var(--card)] border border-[#2F6BFF]/30 text-[#2F6BFF] font-arcade text-lg shadow-[0_10px_24px_-14px_rgba(29,79,224,.45)] hover:bg-[#2F6BFF]/5,61,245,.7)]"><span>💡</span><span>Examples of videos that hit</span></button>
       </div>
 
       {/* LEADERBOARD */}
       <section className="stk p-5 md:p-6" aria-label="Leaderboard">
         <div className="flex items-center justify-between">
           <h2 className="font-arcade text-xl">🏆 Top this week</h2>
-          {meRow && <span className="pill-btn g-grape text-white">You're #{meRow.rank}</span>}
+          {meRow && meRow.views > 0 && <span className="pill-btn g-blue text-white">You're #{meRow.rank}</span>}
         </div>
         {board === null ? (
           <p className="mt-4 text-sm text-[var(--text-dim)]">Loading the board…</p>
@@ -1300,9 +1303,9 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
           <p className="mt-4 text-sm text-[var(--text-dim)]">Nobody's on the board yet this week. Drop a video and take #1 👀</p>
         ) : (
           <>
-            <div className="mt-4 space-y-2.5 rounded-[22px] border-2 border-dashed border-[var(--grape)]/40 p-3">
+            <div className="mt-4 space-y-2.5 rounded-[22px] border-2 border-dashed border-[#2F6BFF]/35 p-3">
               {top3.map((r, i) => (
-                <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[var(--grape)]/10' : ''}`}>
+                <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#2F6BFF]/10' : ''}`}>
                   <span className={`rank ${rankBg[i]}`}>{r.rank}</span>
                   <span className="text-2xl" aria-hidden>{medal[i]}</span>
                   <div className="min-w-0 flex-1">
@@ -1316,7 +1319,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
             {rest.length > 0 && (
               <div className="mt-3 space-y-1">
                 {rest.map((r) => (
-                  <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[var(--grape)]/10' : ''}`}>
+                  <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#2F6BFF]/10' : ''}`}>
                     <span className="rank bg-[var(--elev2)]">{r.rank}</span>
                     <div className="min-w-0 flex-1 font-semibold truncate">{r.name}{r.me && ' (you)'}</div>
                     <div className="font-bold text-sm">{fmtViews(r.views)}</div>
@@ -1331,7 +1334,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       {/* REWARDS ROW */}
       <section aria-label="Rewards">
         <h2 className="font-arcade text-xl mb-1">🎁 Rewards to unlock</h2>
-        <p className="text-sm text-[var(--text-dim)] mb-3">Free merch from your total views, big prizes from one month's views.</p>
+        <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash 💸 Free merch unlocks with your total views, big prizes with one month's views.</p>
         <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pb-2 snap-x">
           {prizes.map((p) => (
             <div key={p.key} className="snap-start flex-shrink-0 w-[150px] text-center">
@@ -1341,7 +1344,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
               <div className="font-bold mt-2 leading-tight text-sm">{p.label}</div>
               <div className="mt-1.5">
                 {p.got
-                  ? <span className="pill-btn g-lime text-[#08210f] inline-block">Unlocked ✓</span>
+                  ? <span className="pill-btn ok-pill inline-block">Unlocked ✓</span>
                   : <span className="pill-btn bg-[var(--elev2)] inline-block">🔒 {p.need}</span>}
               </div>
             </div>
@@ -1364,7 +1367,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
               <div className="font-bold">{q.title}</div>
               <div className="text-xs text-[var(--text-dim)]">{q.sub}</div>
             </div>
-            <span className={`pill-btn ${q.done ? 'g-lime text-[#08210f]' : 'g-grape text-white'}`}>{q.pill}</span>
+            <span className={`pill-btn ${q.done ? 'ok-pill' : 'g-blue text-white'}`}>{q.pill}</span>
           </div>
         ))}
       </section>
@@ -1486,7 +1489,7 @@ const DropPage = ({ submissions, onSubmit, setView }) => {
           <div key={r.key} className={`stk p-4 md:p-5 ${r.error ? 'ring-2 ring-[var(--danger)]' : ''}`}>
             <div className="flex items-center justify-between mb-3">
               <span className="font-arcade text-lg flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl g-grape text-white grid place-items-center text-sm">{i + 1}</span>
+                <span className="w-8 h-8 rounded-xl g-blue text-white grid place-items-center text-sm">{i + 1}</span>
                 {r.url && detectPlatform(r.url) !== 'other' ? <PlatformIcon platform={detectPlatform(r.url)} size={16} /> : null}
               </span>
               {rows.length > 1 && (
@@ -1512,7 +1515,7 @@ const DropPage = ({ submissions, onSubmit, setView }) => {
         ))}
       </div>
 
-      <button onClick={() => setRows((rs) => [...rs, blankRow(rs[rs.length - 1]?.postedAt || today)])} className="w-full h-14 rounded-[24px] border-2 border-dashed border-[var(--grape)]/50 font-bold text-[var(--grape)] hover:bg-[var(--grape)]/5">
+      <button onClick={() => setRows((rs) => [...rs, blankRow(rs[rs.length - 1]?.postedAt || today)])} className="w-full h-14 rounded-[24px] border-2 border-dashed border-[#2F6BFF]/40 font-bold text-[#2F6BFF] hover:bg-[#2F6BFF]/5">
         + Add another video
       </button>
 
@@ -1556,7 +1559,7 @@ const IdeasPage = ({ deal, setView }) => {
                 <span className="block font-bold">Example {i + 1}</span>
                 <span className="block text-xs text-[var(--text-dim)] truncate">{x}</span>
               </span>
-              <span className="pill-btn g-lime text-[#08210f]">Watch ↗</span>
+              <span className="pill-btn g-blue text-white">Watch ↗</span>
             </a>
           ))}
         </div>
@@ -1663,9 +1666,34 @@ const CreatorHistory = ({ submissions }) => {
 // ============================================================================
 //  ROOT APP
 // ============================================================================
+// Each screen has its own #address so Back and refresh work.
+const CREATOR_VIEWS = ['dash', 'drop', 'ideas', 'history', 'rewards'];
+const PUBLIC_VIEWS = ['login', 'invite', 'signup', 'request'];
+const hashView = () => (typeof window === 'undefined' ? '' : window.location.hash.slice(1));
+
 const App = () => {
-  const [view, setView] = useState('landing');
+  const [view, setViewRaw] = useState('landing');
+  const [booting, setBooting] = useState(true); // checking for a saved login
   const [user, setUser] = useState(null);
+  const userRef = useRef(null);
+  userRef.current = user;
+
+  // Switch screens and add a browser history entry.
+  const setView = (v) => {
+    setViewRaw(v);
+    if (typeof window !== 'undefined' && hashView() !== v) {
+      window.history.pushState(null, '', v === 'landing' ? window.location.pathname : `#${v}`);
+    }
+  };
+  // Back / forward buttons.
+  useEffect(() => {
+    const onPop = () => {
+      const v = hashView();
+      setViewRaw(v || (userRef.current ? 'dash' : 'landing'));
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [theme, setTheme] = useState('light');
   const [inviteCode, setInviteCode] = useState('');
 
@@ -1696,10 +1724,17 @@ const App = () => {
     })();
   }, []);
 
-  const enterAs = async (authUser) => {
+  const enterAs = async (authUser, restoring = false) => {
     const { data: cr } = await supabase.from('creators').select('*').eq('id', authUser.id).maybeSingle();
     setUser(cr ? mapCreatorRow(cr) : { id: authUser.id, name: (authUser.email || 'creator').split('@')[0], email: authUser.email, rulesAccepted: false });
-    setView('dash');
+    if (restoring) {
+      // refresh: stay on the page they were on
+      const v = CREATOR_VIEWS.includes(hashView()) ? hashView() : 'dash';
+      setViewRaw(v);
+      window.history.replaceState(null, '', `#${v}`);
+    } else {
+      setView('dash');
+    }
     await loadMine(authUser.id);
   };
 
@@ -1708,9 +1743,12 @@ const App = () => {
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        if (data?.session?.user) await enterAs(data.session.user);
+        if (data?.session?.user) await enterAs(data.session.user, true);
+        else if (PUBLIC_VIEWS.includes(hashView())) setViewRaw(hashView());
       } catch (e) {
         console.error('[madrewards] session restore failed:', friendlyError(e));
+      } finally {
+        setBooting(false);
       }
     })();
   }, []);
@@ -1806,7 +1844,9 @@ const App = () => {
 
   // ─── RENDER ───
   let body;
-  if (view === 'landing') {
+  if (booting) {
+    body = <div className="min-h-screen grid place-items-center"><Logo /></div>;
+  } else if (view === 'landing') {
     body = <LandingPage go={go} theme={theme} setTheme={setTheme} />;
   } else if (view === 'login') {
     body = <LoginPage go={go} onLogin={handleLogin} />;
