@@ -250,22 +250,36 @@ const ThemeStyles = () => (
 
     .font-display { font-family: 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.02em; }
 
-    /* ── game layer: sticker-bomb arcade ── */
-    :root { --ink: #f5f5f5; --lime: #C6FF3D; --grape: #7B5CFF; --gum: #FF4FB8; --sun: #FFD23F; }
-    .light { --ink: #000000; }
-    .font-arcade { font-family: 'Dela Gothic One', 'Bricolage Grotesque', system-ui, sans-serif; letter-spacing: -0.01em; }
-    .stk { border: 2.5px solid var(--ink); border-radius: 24px; box-shadow: 5px 5px 0 var(--ink); }
-    .stk-chip { border: 2px solid var(--ink); border-radius: 999px; }
-    .stk-btn { border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: 4px 4px 0 var(--lime); transition: transform .12s var(--ease), box-shadow .12s var(--ease); }
-    .stk-btn:hover { transform: translate(-1px,-1px); box-shadow: 6px 6px 0 var(--lime); }
-    .stk-btn:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--lime); }
-    .stk-btn:focus-visible, .stk-chip:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
-    .tilt-l { transform: rotate(-1.5deg); } .tilt-r { transform: rotate(1.5deg); }
+    /* ── game layer: bright, glossy, bubbly ── */
+    :root { --ink: #f5f5f5; --lime: #C6FF3D; --grape: #7B5CFF; --gum: #FF4FB8; --sun: #FFD23F; --sky: #38BDF8;
+            --card: #17171b; --card-line: rgba(255,255,255,0.08); }
+    .light { --ink: #14141a; --card: #ffffff; --card-line: rgba(20,20,26,0.06); }
+    .font-arcade { font-family: 'Fredoka', 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 700; letter-spacing: -0.01em; }
+    .stk { background-color: var(--card); border: 1px solid var(--card-line); border-radius: 28px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 14px 32px -18px rgba(76,60,160,.28); }
+    .stk-chip { border: 1px solid var(--card-line); border-radius: 999px; }
+    .stk-btn { border-radius: 999px; background: linear-gradient(135deg, #B8F53A, #3DDC84); color: #08210f !important; box-shadow: 0 10px 24px -8px rgba(61,220,132,.65), inset 0 1px 0 rgba(255,255,255,.5); transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+    .stk-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(61,220,132,.75), inset 0 1px 0 rgba(255,255,255,.5); }
+    .stk-btn:active { transform: translateY(1px) scale(.98); }
+    .stk-btn:focus-visible, .stk-chip:focus-visible, .pill-btn:focus-visible { outline: 3px solid var(--grape); outline-offset: 3px; }
+    .gloss { position: relative; overflow: hidden; }
+    .gloss::after { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 42%); pointer-events: none; border-radius: inherit; }
+    .g-lime  { background: linear-gradient(135deg, #D7FF5C 0%, #7EE34B 55%, #23C483 100%); }
+    .g-grape { background: linear-gradient(135deg, #A78BFA 0%, #7B5CFF 50%, #5B3DF5 100%); }
+    .g-gum   { background: linear-gradient(135deg, #FF9AD5 0%, #FF4FB8 55%, #E0338F 100%); }
+    .g-sky   { background: linear-gradient(135deg, #8BE3FF 0%, #38BDF8 55%, #2563EB 100%); }
+    .g-sun   { background: linear-gradient(135deg, #FFE68A 0%, #FFD23F 50%, #FFA62B 100%); }
+    .badge-orb { width: 108px; height: 108px; border-radius: 34px; display: grid; place-items: center; font-size: 58px;
+                 background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.9), rgba(255,255,255,.25) 45%, rgba(255,255,255,.05) 70%);
+                 box-shadow: inset 0 -6px 14px rgba(0,0,0,.12), 0 12px 28px -10px rgba(0,0,0,.35); transform: rotate(-6deg); }
+    .pill-btn { border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 13px; white-space: nowrap; }
+    .rank { width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; font-family: 'Fredoka', sans-serif; font-weight: 700; flex-shrink: 0; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .tilt-l, .tilt-r { transform: none; }
     @keyframes popIn { 0% { transform: scale(.7); opacity: 0 } 70% { transform: scale(1.04); opacity: 1 } 100% { transform: scale(1) } }
     .pop-in { animation: popIn .45s var(--ease) both; }
     @keyframes confettiFall { 0% { transform: translateY(-40px) rotate(0); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(420px) rotate(320deg); opacity: 0 } }
     .confetti-bit { position: absolute; top: 0; animation: confettiFall 1.6s ease-in both; }
-    @media (prefers-reduced-motion: reduce) { .pop-in, .confetti-bit { animation: none; } .confetti-bit { display: none; } .tilt-l, .tilt-r { transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .pop-in, .confetti-bit { animation: none; } .confetti-bit { display: none; } }
     .font-mono    { font-family: 'JetBrains Mono', monospace; }
     body, .font-body { font-family: 'Manrope', system-ui, sans-serif; }
 
@@ -927,7 +941,7 @@ const RulesContent = () => (
         <li>5️⃣ Cash hits your Cash App 🤑</li>
       </ol>
 
-      <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--lime)] text-black">
+      <div className="gloss g-lime rounded-[24px] p-4 text-[#08210f]">
         <div className="font-arcade text-xl">{fmtCash(PAY_PER_100K)} for every 100K views</div>
         <p className="mt-1">250K = {fmtCash(payForViews(250_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))}</p>
       </div>
@@ -956,7 +970,7 @@ const RulesContent = () => (
         <div className="font-bold mb-2">🎬 Pick your style</div>
         <div className="grid grid-cols-2 gap-2">
           {VIDEO_STYLES.map((v) => (
-            <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)] border-2 border-[var(--ink)]">
+            <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)]">
               <div className="font-semibold">{v.e} {v.t}</div>
               <div className="text-xs text-[var(--text-dim)] mt-0.5">{v.d}</div>
             </div>
@@ -964,7 +978,7 @@ const RulesContent = () => (
         </div>
       </div>
 
-      <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--sun)] text-black">
+      <div className="gloss g-sun rounded-[24px] p-4 text-black">
         <div className="font-arcade text-base">🏷️ The #1 rule</div>
         <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. 🤝</p>
       </div>
@@ -990,7 +1004,7 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
   const max = () => (track.current?.offsetWidth || 320) - KNOB - 8;
   const finish = () => { setX(max()); setDone(true); onDone(); };
   return (
-    <div ref={track} className="relative h-[72px] rounded-full bg-[var(--elev2)] border-[2.5px] border-[var(--ink)] overflow-hidden select-none touch-none">
+    <div ref={track} className="relative h-[68px] rounded-full bg-[var(--elev2)] overflow-hidden select-none touch-none">
       <div className="absolute inset-y-0 left-0 bg-[var(--lime)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
       <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
         {done ? "You're in 🤝" : locked ? '🔒 Scroll to the end to unlock' : <>{label} <span className="ml-2 slide-hint">→→</span></>}
@@ -999,7 +1013,7 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
         type="button"
         aria-label={label}
         disabled={locked}
-        className="absolute top-[5px] left-[4px] w-14 h-14 rounded-full disabled:opacity-30 bg-[var(--ink)] text-[var(--bg)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
+        className="absolute top-[6px] left-[6px] w-14 h-14 rounded-full disabled:opacity-30 g-lime text-[#08210f] shadow-[0_6px_16px_-6px_rgba(35,196,131,.8)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
         style={{ transform: `translateX(${x}px)`, transition: drag ? 'none' : 'transform .3s' }}
         onPointerDown={(e) => { if (done) return; setDrag(true); startX.current = e.clientX - x; e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { if (drag) setX(Math.max(0, Math.min(max(), e.clientX - startX.current))); }}
@@ -1090,9 +1104,9 @@ const DropCelebration = ({ data, onClose }) => (
         <div className="text-6xl">{data.levelUp ? LEVELS[data.level].emoji : '🎉'}</div>
         <h2 className="font-arcade text-3xl mt-3">{data.levelUp ? 'Level up!' : 'Dropped!'}</h2>
         {data.levelUp && <p className="mt-1 font-semibold">You're now <b>{LEVELS[data.level].name}</b> {LEVELS[data.level].emoji}</p>}
-        <div className="mt-5 inline-block stk-chip bg-[var(--lime)] text-black font-arcade text-2xl px-5 py-2">+{fmtCash(data.added)}</div>
+        <div className="mt-5 inline-block rounded-full g-lime text-[#08210f] font-arcade text-2xl px-5 py-2 border-0">+{fmtCash(data.added)}</div>
         <p className="mt-3 text-sm text-[var(--text-dim)]">added to this week's bag (pending until we check Monday) 👀</p>
-        <button onClick={onClose} className="stk-btn mt-6 w-full h-14 bg-[var(--ink)] text-[var(--bg)] font-bold text-base">Keep stacking 💪</button>
+        <button onClick={onClose} className="stk-btn mt-6 w-full h-14 font-bold text-base">Keep stacking 💪</button>
       </div>
     </div>
   </div>
@@ -1112,148 +1126,180 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   const paidTotal = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0);
   const lvl = levelFor(w.views);
   const nextLvl = LEVELS[lvl + 1] || null;
+  const lvlPct = nextLvl ? Math.round(((w.views - LEVELS[lvl].at) / (nextLvl.at - LEVELS[lvl].at)) * 100) : 100;
   const bag = useCountUp(w.pay);
   const [party, setParty] = useState(null);
+  const [board, setBoard] = useState(null);
   const examples = deal?.examples || [];
   const nf = (n) => Number(n || 0).toLocaleString();
 
-  // segmented progress: each level is one segment, filled by views within it
-  const segFill = (i) => {
-    const lo = LEVELS[i].at, hi = LEVELS[i + 1].at;
-    return Math.max(0, Math.min(1, (w.views - lo) / (hi - lo)));
+  const loadBoard = async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) return;
+      const res = await fetch('/api/leaderboard', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setBoard((await res.json()).rows || []);
+    } catch {}
   };
+  useEffect(() => { loadBoard(); }, [submissions.length]);
 
   const handleDrop = async (data) => {
     await onSubmit(data);
-    const after = computeWeek([...subs, { posted: data.postedAt, status: 'pending', views: 0, claimedViews: data.claimedViews }], weekStart(data.postedAt), true);
-    const before = computeWeek(subs, weekStart(data.postedAt), true);
+    const wk = weekStart(data.postedAt);
+    const after = computeWeek([...subs, { posted: data.postedAt, status: 'pending', views: 0, claimedViews: data.claimedViews }], wk, true);
+    const before = computeWeek(subs, wk, true);
     const newLvl = levelFor(after.views);
     setParty({ added: Math.max(0, after.pay - before.pay), level: newLvl, levelUp: newLvl > levelFor(before.views) });
   };
 
+  // every reward in one swipeable row
+  const prizes = [
+    ...MILESTONES.map((ms, i) => ({ key: 'm' + i, emoji: ms.emoji, label: ms.label, need: `${fmtViews(ms.views)} total`, got: life >= ms.views, toGo: ms.views - life, grad: i === 0 ? 'g-sky' : 'g-sun' })),
+    ...MONTHLY_PRIZES.map((p, i) => ({ key: 'p' + i, emoji: p.emoji, label: p.label, need: `${fmtViews(p.views)} this month`, got: m.views >= p.views, toGo: p.views - m.views, grad: i === 0 ? 'g-grape' : 'g-gum' })),
+  ];
+  const top3 = (board || []).slice(0, 3);
+  const rest = (board || []).slice(3);
+  const meRow = (board || []).find((r) => r.me);
+  const medal = ['🥇', '🥈', '🥉'];
+  const rankBg = ['g-sun', 'bg-[#E5E7EB] text-black', 'bg-[#F5B98A] text-black'];
+
   return (
-    <div className="max-w-2xl mx-auto space-y-7">
+    <div className="max-w-2xl mx-auto space-y-8">
       {party && <DropCelebration data={party} onClose={() => setParty(null)} />}
 
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <h1 className="font-arcade text-3xl md:text-4xl leading-none">Welcome back, {user.name.split(' ')[0]}.</h1>
-        <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'bg-[var(--sun)] text-black' : 'bg-[var(--elev1)]'}`}>
+        <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'g-sun text-black border-transparent' : 'bg-[var(--card)]'}`}>
           <span className="mr-1.5">⏰</span>{lastCall ? 'Last call: closes tonight 11:59pm' : 'Submit by Sat 11:59pm'}
         </span>
       </div>
 
-      {/* THE BAG — the one big moment */}
-      <section className="stk bg-[var(--lime)] text-black p-6 md:p-8" aria-label="This week's earnings">
-        <div className="flex items-start justify-between gap-3">
-          <p className="font-bold">This week's bag 💰</p>
-          <span className="stk-chip bg-white px-3 py-1 text-sm font-bold whitespace-nowrap"><span className="mr-1.5">{LEVELS[lvl].emoji}</span>{LEVELS[lvl].name}</span>
+      {/* LEVEL CARD — the one big moment */}
+      <section className="gloss g-lime rounded-[32px] p-6 md:p-8 text-[#08210f] shadow-[0_24px_48px_-20px_rgba(35,196,131,.7)]" aria-label="This week">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <span className="inline-block rounded-full bg-white/70 px-3 py-1 text-xs font-bold">This week's level</span>
+            <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none">{LEVELS[lvl].name}</div>
+            <div className="mt-4 text-sm font-semibold opacity-80">Your bag so far</div>
+            <div className="font-arcade text-6xl md:text-7xl leading-none tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
+          </div>
+          <div className="badge-orb flex-shrink-0" aria-hidden>{LEVELS[lvl].emoji}</div>
         </div>
-        <div className="font-arcade text-[64px] md:text-[88px] leading-[0.95] mt-3 tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
-        <p className="mt-2 font-semibold">{nf(w.views)} views · {w.videos} video{w.videos === 1 ? '' : 's'} this week</p>
 
-        <div className="mt-5 grid grid-cols-3 gap-1.5" role="img" aria-label={`${LEVELS[lvl].name}: ${nf(w.views)} of ${nf(CAP_VIEWS)} views`}>
-          {LEVELS.slice(0, -1).map((l, i) => (
-            <div key={i}>
-              <div className="h-4 rounded-full border-2 border-black bg-white/60 overflow-hidden">
-                <div className="h-full bg-black rounded-full transition-[width] duration-700" style={{ width: `${segFill(i) * 100}%` }} />
+        <div className="mt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-4 rounded-full bg-white/50 overflow-hidden">
+              <div className="h-full rounded-full bg-[#08210f] transition-[width] duration-700" style={{ width: `${lvlPct}%` }} />
+            </div>
+            <span className="w-11 h-11 rounded-full bg-white grid place-items-center text-xl shadow" aria-hidden>{nextLvl ? '🔒' : '👑'}</span>
+          </div>
+          <p className="mt-2 text-sm font-semibold">
+            {nextLvl
+              ? <>{fmtViews(nextLvl.at - w.views)} more views to unlock {nextLvl.emoji} {nextLvl.name}</>
+              : <>You maxed out this week. Absolute legend 👑</>}
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold">
+          <span className="rounded-full bg-white/70 px-3 py-1.5">👀 {nf(w.views)} views</span>
+          <span className="rounded-full bg-white/70 px-3 py-1.5">🎬 {w.videos} video{w.videos === 1 ? '' : 's'}</span>
+          <span className="rounded-full bg-white/70 px-3 py-1.5">💸 {fmtCash(PAY_PER_100K)} per 100K</span>
+        </div>
+        <p className="mt-3 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
+      </section>
+
+      <a href="#drop" className="stk-btn flex items-center justify-center gap-2 h-16 font-arcade text-xl"><span>📲</span><span>Drop a video</span></a>
+
+      {/* LEADERBOARD */}
+      <section className="stk p-5 md:p-6" aria-label="Leaderboard">
+        <div className="flex items-center justify-between">
+          <h2 className="font-arcade text-xl">🏆 Top this week</h2>
+          {meRow && <span className="pill-btn g-grape text-white">You're #{meRow.rank}</span>}
+        </div>
+        {board === null ? (
+          <p className="mt-4 text-sm text-[var(--text-dim)]">Loading the board…</p>
+        ) : board.every((r) => r.views === 0) ? (
+          <p className="mt-4 text-sm text-[var(--text-dim)]">Nobody's on the board yet this week. Drop a video and take #1 👀</p>
+        ) : (
+          <>
+            <div className="mt-4 space-y-2.5 rounded-[22px] border-2 border-dashed border-[var(--grape)]/40 p-3">
+              {top3.map((r, i) => (
+                <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[var(--grape)]/10' : ''}`}>
+                  <span className={`rank ${rankBg[i]}`}>{r.rank}</span>
+                  <span className="text-2xl" aria-hidden>{medal[i]}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold truncate">{r.name}{r.me && ' (you)'}</div>
+                    {r.handle && <div className="text-xs text-[var(--text-dim)] truncate">{r.handle}</div>}
+                  </div>
+                  <div className="font-arcade text-lg">{fmtViews(r.views)}</div>
+                </div>
+              ))}
+            </div>
+            {rest.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {rest.map((r) => (
+                  <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[var(--grape)]/10' : ''}`}>
+                    <span className="rank bg-[var(--elev2)]">{r.rank}</span>
+                    <div className="min-w-0 flex-1 font-semibold truncate">{r.name}{r.me && ' (you)'}</div>
+                    <div className="font-bold text-sm">{fmtViews(r.views)}</div>
+                  </div>
+                ))}
               </div>
-              <div className="text-[11px] font-bold mt-1.5 leading-tight"><span className="mr-1">{LEVELS[i + 1].emoji}</span>{fmtViews(LEVELS[i + 1].at)}</div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* REWARDS ROW */}
+      <section aria-label="Rewards">
+        <h2 className="font-arcade text-xl mb-1">🎁 Rewards to unlock</h2>
+        <p className="text-sm text-[var(--text-dim)] mb-3">Free merch from your total views, big prizes from one month's views.</p>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pb-2 snap-x">
+          {prizes.map((p) => (
+            <div key={p.key} className="snap-start flex-shrink-0 w-[150px] text-center">
+              <div className={`gloss ${p.grad} rounded-[26px] h-[132px] grid place-items-center text-6xl shadow-[0_14px_28px_-14px_rgba(0,0,0,.45)] ${p.got ? '' : 'saturate-[.85]'}`}>
+                <span aria-hidden>{p.emoji}</span>
+              </div>
+              <div className="font-bold mt-2 leading-tight text-sm">{p.label}</div>
+              <div className="mt-1.5">
+                {p.got
+                  ? <span className="pill-btn g-lime text-[#08210f] inline-block">Unlocked ✓</span>
+                  : <span className="pill-btn bg-[var(--elev2)] inline-block">🔒 {p.need}</span>}
+              </div>
             </div>
           ))}
         </div>
-
-        <p className="mt-4 text-sm font-semibold">
-          {nextLvl
-            ? `${fmtViews(nextLvl.at - w.views)} more views to ${nextLvl.emoji} ${nextLvl.name}. Every 100K = ${fmtCash(PAY_PER_100K)} 💸`
-            : `You maxed out this week. Absolute legend 👑`}
-        </p>
-        <p className="mt-1 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
 
-      <a href="#drop" className="stk-btn flex items-center justify-center gap-2 h-16 bg-[var(--ink)] text-[var(--bg)] font-arcade text-xl"><span>📲</span><span>Drop a video</span></a>
-
-      {/* weekly max — its own section */}
-      <section className="stk bg-[var(--elev1)] p-5 flex items-center gap-4" aria-label="Weekly max">
-        <div className="text-4xl">💎</div>
-        <div className="min-w-0">
-          <div className="font-arcade text-lg leading-tight">Weekly max: {fmtCash(WEEKLY_CAP)}</div>
-          <p className="text-sm text-[var(--text-dim)] mt-0.5">That's {fmtViews(CAP_VIEWS)} views. Anything past that still counts toward free merch and the big prizes.</p>
-        </div>
-      </section>
-
-      {/* side quests */}
-      <section aria-label="Bonuses">
-        <h2 className="font-arcade text-xl mb-3">Side quests</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="stk bg-[var(--elev1)] p-5">
-            <div className="text-3xl">🎁</div>
-            <div className="font-bold mt-2">Free re-up</div>
-            <div className="text-sm text-[var(--text-dim)]">Post {REUP_VIDEOS} videos by {fmtDay(reup.end)}</div>
-            <div className="font-arcade text-2xl mt-3">{Math.min(reup.videos, REUP_VIDEOS)}<span className="text-[var(--text-dim)] text-base">/{REUP_VIDEOS}</span></div>
-            <div className="mt-2 flex gap-1">{Array.from({ length: REUP_VIDEOS }).map((_, i) => <span key={i} className={`h-2.5 flex-1 rounded-full border-2 border-[var(--ink)] ${i < reup.videos ? 'bg-[var(--grape)]' : ''}`} />)}</div>
+      {/* SIDE QUESTS */}
+      <section className="stk p-2" aria-label="Side quests">
+        <h2 className="font-arcade text-xl px-4 pt-3 pb-1">⚡ Side quests</h2>
+        {[
+          { emoji: '📦', title: 'Free re-up', sub: `Post ${REUP_VIDEOS} videos by ${fmtDay(reup.end)}`, pill: reup.videos >= REUP_VIDEOS ? 'Earned ✓' : `${reup.videos}/${REUP_VIDEOS}`, done: reup.videos >= REUP_VIDEOS },
+          { emoji: '😎', title: 'Logo pfp', sub: 'Make the Mad Labs logo your profile pic', pill: `+${fmtCash(LOGO_PFP_BONUS)}/wk`, done: false },
+          { emoji: '💎', title: 'Weekly max', sub: `Up to ${fmtCash(WEEKLY_CAP)} a week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
+          { emoji: '🤑', title: 'Paid to you', sub: 'All-time, straight to your Cash App', pill: fmtCash(paidTotal), done: false },
+        ].map((q) => (
+          <div key={q.title} className="flex items-center gap-3 rounded-[22px] p-3 hover:bg-[var(--elev2)]">
+            <span className="w-12 h-12 rounded-2xl bg-[var(--elev2)] grid place-items-center text-2xl flex-shrink-0" aria-hidden>{q.emoji}</span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold">{q.title}</div>
+              <div className="text-xs text-[var(--text-dim)]">{q.sub}</div>
+            </div>
+            <span className={`pill-btn ${q.done ? 'g-lime text-[#08210f]' : 'g-grape text-white'}`}>{q.pill}</span>
           </div>
-          <div className="stk bg-[var(--elev1)] p-5">
-            <div className="text-3xl">😎</div>
-            <div className="font-bold mt-2">Logo pfp</div>
-            <div className="text-sm text-[var(--text-dim)]">Make the Mad Labs logo your profile pic</div>
-            <div className="font-arcade text-2xl mt-3">+{fmtCash(LOGO_PFP_BONUS)}<span className="text-[var(--text-dim)] text-base">/week</span></div>
-          </div>
-          <div className="stk bg-[var(--elev1)] p-5">
-            <div className="text-3xl">🤑</div>
-            <div className="font-bold mt-2">Paid to you</div>
-            <div className="text-sm text-[var(--text-dim)]">All-time, straight to your Cash App</div>
-            <div className="font-arcade text-2xl mt-3">{fmtCash(paidTotal)}</div>
-          </div>
-        </div>
-      </section>
-
-      {/* merch unlocks */}
-      <section aria-label="Free merch">
-        <h2 className="font-arcade text-xl mb-1">Free merch drops</h2>
-        <p className="text-sm text-[var(--text-dim)] mb-3">Unlocks with your total views. You're at {nf(life)}.</p>
-        <div className="grid grid-cols-2 gap-3">
-          {MILESTONES.map((ms) => {
-            const got = life >= ms.views;
-            return (
-              <div key={ms.views} className={`stk p-5 text-center ${got ? 'bg-[var(--lime)] text-black' : 'bg-[var(--elev1)]'}`}>
-                <div className={`text-5xl ${got ? '' : 'grayscale opacity-60'}`}>{ms.emoji}</div>
-                <div className="font-bold mt-2">{ms.label}</div>
-                <div className={`text-sm mt-0.5 ${got ? 'font-bold' : 'text-[var(--text-dim)]'}`}>{got ? 'Unlocked ✓' : `${fmtViews(ms.views - life)} views to go`}</div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* big prizes */}
-      <section aria-label="Monthly prizes">
-        <h2 className="font-arcade text-xl mb-1">The big ones 🏆</h2>
-        <p className="text-sm text-[var(--text-dim)] mb-3">Hit these in one month ({monthLabel(monthStart(today))}). You're at {nf(m.views)}.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {MONTHLY_PRIZES.map((p, i) => {
-            const pct = Math.min(100, Math.round((m.views / p.views) * 100));
-            const won = m.views >= p.views;
-            return (
-              <div key={p.views} className={`stk p-6 text-white ${i === 0 ? 'bg-[var(--grape)] tilt-l' : 'bg-[var(--gum)] tilt-r'}`}>
-                <div className="text-5xl">{p.emoji}</div>
-                <div className="font-arcade text-xl mt-3 leading-tight">{p.label}</div>
-                <div className="text-sm mt-1 font-semibold opacity-90">{fmtViews(p.views)} views in a month</div>
-                <div className="mt-4 h-3 rounded-full bg-black/25 overflow-hidden"><div className="h-full bg-white rounded-full" style={{ width: `${pct}%` }} /></div>
-                <div className="text-xs font-bold mt-1.5">{won ? 'WON 🎉 we\'ll hit you up' : `${pct}% there`}</div>
-              </div>
-            );
-          })}
-        </div>
+        ))}
       </section>
 
       <div id="drop" className="scroll-mt-24"><SubmitForm user={user} onSubmit={handleDrop} /></div>
 
       {examples.length > 0 && (
         <section aria-label="Example videos">
-          <h2 className="font-arcade text-xl mb-3">Need ideas? 💡</h2>
+          <h2 className="font-arcade text-xl mb-3">💡 Need ideas?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {examples.map((x, i) => (
-              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer" className="stk-chip flex items-center justify-between gap-3 p-4 bg-[var(--elev1)]">
+              <a key={i} href={toUrl(x)} target="_blank" rel="noreferrer" className="stk flex items-center justify-between gap-3 p-4">
                 <span className="flex items-center gap-3 min-w-0"><PlatformIcon platform={detectPlatform(x)} /><span className="text-sm truncate">{x}</span></span>
                 <ExternalLink size={15} className="flex-shrink-0" />
               </a>
@@ -1264,11 +1310,11 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
       <section aria-label="Recent videos">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-arcade text-xl">Your drops</h2>
+          <h2 className="font-arcade text-xl">🎬 Your drops</h2>
           <button onClick={() => setView('history')} className="text-sm font-bold underline underline-offset-4">See all</button>
         </div>
         {mine.length === 0 ? (
-          <div className="stk p-8 text-center bg-[var(--elev1)]">
+          <div className="stk p-8 text-center">
             <div className="text-4xl">🎬</div>
             <p className="mt-2 font-semibold">Nothing yet. Drop your first video above and start stacking.</p>
           </div>
@@ -1312,7 +1358,7 @@ const SubmitForm = ({ user, onSubmit }) => {
   };
 
   return (
-    <div className="stk bg-[var(--elev1)] p-6 md:p-8">
+    <div className="stk p-6 md:p-8">
       <div className="mb-6">
         <h2 className="font-arcade text-2xl"><span className="mr-2">📲</span>Drop a video</h2>
         <p className="text-sm text-[var(--text-dim)] mt-1">One at a time: the link, the day you posted it, and its views right now.</p>
@@ -1384,7 +1430,7 @@ const SubmitForm = ({ user, onSubmit }) => {
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
           {error && <span className="text-xs text-[var(--danger)] flex items-center gap-1.5 font-semibold"><X size={13} strokeWidth={3} />{error}</span>}
           
-          <button type="submit" disabled={!ready || submitting} className="stk-btn h-14 px-6 w-full sm:w-auto bg-[var(--ink)] text-[var(--bg)] font-arcade text-lg disabled:opacity-40 disabled:pointer-events-none">{submitting ? 'Dropping…' : 'Drop it 🚀'}</button>
+          <button type="submit" disabled={!ready || submitting} className="stk-btn h-14 px-6 w-full sm:w-auto font-arcade text-lg disabled:opacity-40 disabled:pointer-events-none">{submitting ? 'Dropping…' : 'Drop it 🚀'}</button>
         </div>
       </form>
     </div>
@@ -1394,9 +1440,9 @@ const SubmitForm = ({ user, onSubmit }) => {
 const SubmissionRow = ({ sub }) => {
   const verified = sub.status === 'approved' || sub.status === 'paid';
   return (
-    <div className="border-2 border-[var(--ink)] rounded-[20px] bg-[var(--elev1)] p-4 md:p-5">
+    <div className="stk rounded-[24px] p-4 md:p-5">
       <div className="flex items-start gap-4">
-        <div className="w-11 h-11 rounded-full bg-[var(--elev2)] border-2 border-[var(--ink)] flex items-center justify-center flex-shrink-0">
+        <div className="w-11 h-11 rounded-2xl bg-[var(--elev2)] flex items-center justify-center flex-shrink-0">
           <PlatformIcon platform={sub.platform} size={16} />
         </div>
         <div className="flex-1 min-w-0">
@@ -1425,7 +1471,7 @@ const CreatorRewards = () => (
       <h1 className="font-arcade text-4xl md:text-5xl mt-2">The deal 🤝</h1>
       <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place. 📌</p>
     </div>
-    <div className="stk bg-[var(--elev1)] p-6 md:p-8 max-w-2xl">
+    <div className="stk p-6 md:p-8 max-w-2xl">
       <RulesContent />
     </div>
   </div>
