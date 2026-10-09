@@ -75,6 +75,7 @@ function Icon({ d, size = 18 }: { d: string; size?: number }) {
 }
 
 export default function AdminPage() {
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [authed, setAuthed] = useState(false)
   const [creators, setCreators] = useState<Creator[]>([])
@@ -100,7 +101,7 @@ export default function AdminPage() {
   const call = async (payload: object) => {
     const res = await fetch('/api/admin', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, ...payload }),
+      body: JSON.stringify({ username, password, ...payload }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Request failed')
@@ -212,9 +213,10 @@ export default function AdminPage() {
         <div className="card login">
           <div className="brand login-brand"><span className="brand-mark" />MAD <b>REWARDS</b></div>
           <h1 className="login-h1">Admin access</h1>
-          <p className="muted">Enter your admin password to continue.</p>
+          <p className="muted">Sign in to continue.</p>
           <form onSubmit={login} style={{ marginTop: 18 }}>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input" style={{ width: '100%' }} />
+            <input type="text" autoComplete="username" autoCapitalize="off" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="input" style={{ width: '100%', marginBottom: 10 }} />
+            <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="input" style={{ width: '100%' }} />
             <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }}>
               {loading ? 'Checking…' : 'Enter dashboard'}
             </button>
@@ -308,7 +310,7 @@ export default function AdminPage() {
           <button className="navbtn" onClick={() => setTheme(dark ? 'light' : 'dark')}>
             <Icon d={dark ? Ico.sun : Ico.moon} size={18} /><span>{dark ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <button className="navbtn danger" onClick={() => { setAuthed(false); setPassword('') }}>
+          <button className="navbtn danger" onClick={() => { setAuthed(false); setUsername(''); setPassword('') }}>
             <Icon d={Ico.logout} size={18} /><span>Log out</span>
           </button>
         </div>

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 // Server-only. Service key never reaches the browser; it bypasses RLS for admin edits.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
@@ -23,8 +24,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
   }
 
-  if (!ADMIN_PASSWORD || body.password !== ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Wrong password' }, { status: 401 })
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD || body.username !== ADMIN_USERNAME || body.password !== ADMIN_PASSWORD) {
+    return NextResponse.json({ error: 'Wrong username or password' }, { status: 401 })
   }
 
   // ---- list everything ----
