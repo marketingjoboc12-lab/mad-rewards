@@ -1013,6 +1013,7 @@ const RulesContent = () => (
       </ol>
 
       <div className="gloss g-lime rounded-[24px] p-4 text-[#08210f]">
+        <div className="text-xs font-bold opacity-80">This week's rate</div>
         <div className="font-arcade text-xl">{fmtCash(PAY_PER_100K)} for every 100K views</div>
         <p className="mt-1">250K = {fmtCash(payForViews(250_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))}</p>
       </div>
@@ -1031,9 +1032,11 @@ const RulesContent = () => (
       </div>
 
       <div className="rounded-[24px] p-4 bg-[var(--elev2)]">
-        <div className="font-bold mb-1">💎 Weekly cap</div>
-        <p>You can earn up to <b>{fmtCash(WEEKLY_CAP)} a week</b> from views (that's {fmtViews(CAP_VIEWS)} views). Anything past that still counts toward free merch and the big prizes.</p>
+        <div className="font-bold mb-1">💎 This week's cap</div>
+        <p>This week you can earn up to <b>{fmtCash(WEEKLY_CAP)}</b> from views (that's {fmtViews(CAP_VIEWS)} views). Anything past that still counts toward free merch and the big prizes.</p>
       </div>
+
+      <p className="text-xs text-[var(--text-dim)]">🔄 Rates, caps and rewards can change from week to week. Whatever you see on your dashboard is what that week pays.</p>
     </Sec>
 
     <Sec title="The rules 📜">
@@ -1285,7 +1288,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         <div className="mt-5 flex flex-wrap gap-2 text-sm font-bold">
           <span className="rounded-full bg-white/70 px-3 py-1.5">👀 {nf(w.views)} views</span>
           <span className="rounded-full bg-white/70 px-3 py-1.5">🎬 {w.videos} video{w.videos === 1 ? '' : 's'}</span>
-          <span className="rounded-full bg-white/70 px-3 py-1.5">💸 {fmtCash(PAY_PER_100K)} per 100K</span>
+          <span className="rounded-full bg-white/70 px-3 py-1.5">💸 This week: {fmtCash(PAY_PER_100K)} per 100K</span>
         </div>
         <p className="mt-3 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
@@ -1359,7 +1362,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         {[
           { emoji: '📦', title: 'Free re-up', sub: `Post ${REUP_VIDEOS} videos by ${fmtDay(reup.end)}`, pill: reup.videos >= REUP_VIDEOS ? 'Earned ✓' : `${reup.videos}/${REUP_VIDEOS}`, done: reup.videos >= REUP_VIDEOS },
           { emoji: '😎', title: 'Logo pfp', sub: 'Make the Mad Labs logo your profile pic', pill: `+${fmtCash(LOGO_PFP_BONUS)}/wk`, done: false },
-          { emoji: '💎', title: 'Weekly cap', sub: `Up to ${fmtCash(WEEKLY_CAP)} a week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
+          { emoji: '💎', title: "This week's cap", sub: `Up to ${fmtCash(WEEKLY_CAP)} this week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
           { emoji: '🤑', title: 'Paid to you', sub: 'All-time, straight to your Cash App', pill: fmtCash(paidTotal), done: false },
         ].map((q) => (
           <div key={q.title} className="flex items-center gap-3 rounded-[22px] p-3 hover:bg-[var(--elev2)]">
