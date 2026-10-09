@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 // Server-only. Service key never reaches the browser; it bypasses RLS for admin edits.
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -8,6 +9,27 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+
+// ---- "remember me" session cookie (httpOnly, 7 days) ----
+// Signed with the admin password + service key, so changing the password logs everyone out.
+const COOKIE = 'mr_admin'
+const SESSION_DAYS = 7
+const sign = (exp: string) =>
+  createHmac('sha256', `${(ADMIN_PASSWORD || '').trim()}|${serviceKey}`).update(`admin|${exp}`).digest('hex')
+const makeSession = () => {
+  const exp = String(Date.now() + SESSION_DAYS * 86_400_000)
+  return `${exp}.${sign(exp)}`
+}
+const hasValidSession = (req: Request) => {
+  const raw = (req.headers.get('cookie') || '').split(/;\s*/).find((c) => c.startsWith(COOKIE + '='))
+  if (!raw) return false
+  const [exp, sig] = decodeURIComponent(raw.slice(COOKIE.length + 1)).split('.')
+  if (!exp || !sig || Number(exp) < Date.now()) return false
+  const want = Buffer.from(sign(exp)), got = Buffer.from(sig)
+  return want.length === got.length && timingSafeEqual(want, got)
+}
+const sessionCookie = (value: string, maxAge: number) =>
+  `${COOKIE}=${value}; Path=/api/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`
 
 // Generate a friendly one-time code like MAD-7K2P-9QX4
 function makeCode() {
@@ -30,8 +52,26 @@ export async function POST(req: Request) {
   if (!wantUser || !wantPass) {
     return NextResponse.json({ error: `Admin login isn't set up: add ${!wantUser ? 'ADMIN_USERNAME' : 'ADMIN_PASSWORD'} in Vercel, then redeploy.` }, { status: 500 })
   }
-  if (String(body.username || '').trim().toLowerCase() !== wantUser || String(body.password || '').trim() !== wantPass) {
-    return NextResponse.json({ error: 'Wrong username or password' }, { status: 401 })
+
+  if (body.action === 'logout') {
+    const res = NextResponse.json({ ok: true })
+    res.headers.set('Set-Cookie', sessionCookie('', 0))
+    return res
+  }
+
+  // Log in with username + password -> get a 7-day session cookie.
+  if (body.action === 'login') {
+    if (String(body.username || '').trim().toLowerCase() !== wantUser || String(body.password || '').trim() !== wantPass) {
+      return NextResponse.json({ error: 'Wrong username or password' }, { status: 401 })
+    }
+    const res = NextResponse.json({ ok: true })
+    res.headers.set('Set-Cookie', sessionCookie(makeSession(), SESSION_DAYS * 86_400))
+    return res
+  }
+
+  // Every other action needs a valid session.
+  if (!hasValidSession(req)) {
+    return NextResponse.json({ error: 'Session expired. Please log in again.', loggedOut: true }, { status: 401 })
   }
 
   // ---- list everything ----

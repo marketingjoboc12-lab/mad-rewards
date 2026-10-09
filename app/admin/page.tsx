@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   VIEW_TIERS, POSTING_BONUSES, MONTHLY_PRIZES, LOGO_PFP_BONUS,
   computeWeek, computeMonth, lastClosedWeek, weekStart, monthStart, addDays,
@@ -101,9 +101,10 @@ export default function AdminPage() {
   const call = async (payload: object) => {
     const res = await fetch('/api/admin', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, ...payload }),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
+    if (data.loggedOut) setAuthed(false)
     if (!res.ok) throw new Error(data.error || 'Request failed')
     return data
   }
@@ -120,8 +121,22 @@ export default function AdminPage() {
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await load(); setAuthed(true) } catch (err: any) { setError(err.message) } finally { setLoading(false) }
+    try {
+      await call({ action: 'login', username, password })
+      await load(); setAuthed(true); setPassword('')
+    } catch (err: any) { setError(err.message) } finally { setLoading(false) }
   }
+  const logout = async () => {
+    try { await call({ action: 'logout' }) } catch {}
+    setAuthed(false); setUsername(''); setPassword('')
+  }
+
+  // Already logged in on this browser? Skip the login screen.
+  const [checking, setChecking] = useState(true)
+  useEffect(() => {
+    load().then(() => setAuthed(true)).catch(() => {}).finally(() => setChecking(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const refresh = async () => { setError(''); try { await load() } catch (err: any) { setError(err.message) } }
 
   const update = async (id: string, patch: Partial<Submission>) => {
@@ -220,6 +235,9 @@ export default function AdminPage() {
   }
 
   // ---------- login ----------
+  if (!authed && checking) {
+    return <div className="madx madx-center" style={vars}><style>{CSS}</style><p className="muted">Loading…</p></div>
+  }
   if (!authed) {
     return (
       <div className="madx madx-center" style={vars}>
@@ -324,7 +342,7 @@ export default function AdminPage() {
           <button className="navbtn" onClick={() => setTheme(dark ? 'light' : 'dark')}>
             <Icon d={dark ? Ico.sun : Ico.moon} size={18} /><span>{dark ? 'Light mode' : 'Dark mode'}</span>
           </button>
-          <button className="navbtn danger" onClick={() => { setAuthed(false); setUsername(''); setPassword('') }}>
+          <button className="navbtn danger" onClick={logout}>
             <Icon d={Ico.logout} size={18} /><span>Log out</span>
           </button>
         </div>
