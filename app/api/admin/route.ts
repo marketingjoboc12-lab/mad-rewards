@@ -24,7 +24,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 })
   }
 
-  if (!ADMIN_USERNAME || !ADMIN_PASSWORD || body.username !== ADMIN_USERNAME || body.password !== ADMIN_PASSWORD) {
+  // Trim stray spaces/newlines pasted into Vercel; username isn't case-sensitive.
+  const wantUser = (ADMIN_USERNAME || '').trim().toLowerCase()
+  const wantPass = (ADMIN_PASSWORD || '').trim()
+  if (!wantUser || !wantPass) {
+    return NextResponse.json({ error: `Admin login isn't set up: add ${!wantUser ? 'ADMIN_USERNAME' : 'ADMIN_PASSWORD'} in Vercel, then redeploy.` }, { status: 500 })
+  }
+  if (String(body.username || '').trim().toLowerCase() !== wantUser || String(body.password || '').trim() !== wantPass) {
     return NextResponse.json({ error: 'Wrong username or password' }, { status: 401 })
   }
 
