@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase, SUPABASE_URL_IN_USE } from '@/lib/supabase';
 import {
-  RATE_BANDS, WEEKLY_CAP, CAP_VIEWS, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
+  PAY_PER_100K, WEEKLY_CAP, CAP_VIEWS, LEVELS, levelFor, RULES_UPDATED, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
   computeWeek, computeMonth, computeReup, lifetimeViews, payForViews, todayLocal, weekStart, monthStart, addDays,
   weekLabel, monthLabel, earliestSubmittableDate, normalizeVideoUrl,
 } from '@/lib/rewards';
@@ -64,7 +64,7 @@ const mapCreatorRow = (r) => ({
   instagram: r.instagram_handle,
   status: r.status,
   joined: r.created_at,
-  rulesAccepted: !!r.rules_accepted_at,
+  rulesAccepted: !!r.rules_accepted_at && r.rules_accepted_at >= RULES_UPDATED,
 });
 
 // Shape the reward math in lib/rewards.ts expects.
@@ -828,7 +828,7 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
   const tabs = [
     { k: 'dash',    label: 'Home',      icon: BarChart3 },
     { k: 'history', label: 'My drops',  icon: Inbox },
-    { k: 'rewards', label: 'Rules',     icon: Trophy },
+    { k: 'rewards', label: 'How it works', icon: Trophy },
   ];
 
   return (
@@ -906,71 +906,81 @@ const VIDEO_STYLES = [
   { e: '💨', t: 'Blinker', d: 'You taking a blinker — on camera' },
 ];
 
+const Sec = ({ title, children }) => (
+  <section>
+    <h3 className="font-arcade text-2xl mb-3">{title}</h3>
+    <div className="space-y-5">{children}</div>
+  </section>
+);
+const Row = ({ left, right }) => (
+  <div className="flex justify-between gap-3 border-b border-[var(--border)] py-1.5"><span>{left}</span><b className="text-right">{right}</b></div>
+);
+
 const RulesContent = () => (
-  <div className="space-y-7 text-sm leading-relaxed">
-    <div>
-      <h3 className="font-arcade text-lg mb-3">🎬 Pick your style</h3>
-      <div className="grid grid-cols-2 gap-2">
-        {VIDEO_STYLES.map((s) => (
-          <div key={s.t} className="p-3 rounded-2xl bg-[var(--elev2)] border-2 border-[var(--ink)]">
-            <div className="font-semibold">{s.e} {s.t}</div>
-            <div className="text-xs text-[var(--text-dim)] mt-0.5">{s.d}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--lime)] text-black">
-      <div className="font-arcade text-base">🏷️ The #1 rule</div>
-      <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. Simple as that. 🤝</p>
-    </div>
-
-    <div>
-      <h3 className="font-arcade text-lg mb-2">📅 How the week works</h3>
+  <div className="space-y-9 text-sm leading-relaxed">
+    <Sec title="How it works 💸">
       <ol className="space-y-1.5">
-        <li>1️⃣ Post your videos <b>Sunday → Saturday</b></li>
+        <li>1️⃣ Post your Mad Labs videos <b>Sunday → Saturday</b></li>
         <li>2️⃣ Drop every link + its views here by <b>Saturday 11:59pm</b></li>
-        <li>3️⃣ Forgot? We'll email you Sunday — that's your <b>last call</b> ⏰</li>
+        <li>3️⃣ Forgot? We'll email you Sunday. That's your <b>last call</b> ⏰</li>
         <li>4️⃣ <b>Monday</b> we check every video by hand 👀</li>
-        <li>5️⃣ Cash hits your Cash App 💸</li>
+        <li>5️⃣ Cash hits your Cash App 🤑</li>
       </ol>
-    </div>
 
-    <div>
-      <h3 className="font-arcade text-lg mb-2">🚨 Don't fumble the bag</h3>
-      <ul className="space-y-1.5">
-        <li>🚫 <b>Video must still be up when we check Monday.</b> TikTok & IG take down cannabis stuff a lot — if it's gone, it doesn't count.</li>
+      <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--lime)] text-black">
+        <div className="font-arcade text-xl">{fmtCash(PAY_PER_100K)} for every 100K views</div>
+        <p className="mt-1">250K = {fmtCash(payForViews(250_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))}</p>
+      </div>
+
+      <div>
+        <div className="font-bold mb-1">📈 Your views stack</div>
+        <p>Every video you post that week adds into one total. 10 videos × 10K views = 100K = {fmtCash(PAY_PER_100K)}. Your all-time views keep stacking toward free merch, and your monthly views toward the big prizes.</p>
+      </div>
+
+      <div>
+        <div className="font-bold mb-1">💎 Weekly max</div>
+        <p>The most you can earn from views in one week is <b>{fmtCash(WEEKLY_CAP)}</b> ({fmtViews(CAP_VIEWS)} views). Views past that still count toward merch and the big prizes.</p>
+      </div>
+
+      <div>
+        <div className="font-bold mb-1">🎁 Extras</div>
+        <Row left="😎 Mad Labs logo as your pfp" right={`+${fmtCash(LOGO_PFP_BONUS)}/week`} />
+        <Row left={`📦 ${REUP_VIDEOS} videos in 2 weeks`} right="Free re-up" />
+        {MILESTONES.map((ms) => <Row key={ms.views} left={`${ms.emoji} ${fmtViews(ms.views)} total views`} right={ms.label} />)}
+        {MONTHLY_PRIZES.map((p) => <Row key={p.views} left={`${p.emoji} ${fmtViews(p.views)} views in one month`} right={p.label} />)}
+      </div>
+    </Sec>
+
+    <Sec title="The rules 📜">
+      <div>
+        <div className="font-bold mb-2">🎬 Pick your style</div>
+        <div className="grid grid-cols-2 gap-2">
+          {VIDEO_STYLES.map((v) => (
+            <div key={v.t} className="p-3 rounded-2xl bg-[var(--elev2)] border-2 border-[var(--ink)]">
+              <div className="font-semibold">{v.e} {v.t}</div>
+              <div className="text-xs text-[var(--text-dim)] mt-0.5">{v.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-2 border-[var(--ink)] rounded-[20px] p-4 bg-[var(--sun)] text-black">
+        <div className="font-arcade text-base">🏷️ The #1 rule</div>
+        <p className="mt-1">The <b>MAD LABS</b> name has to be <b>clearly visible</b> in every video. No brand on screen = no pay. 🤝</p>
+      </div>
+
+      <ul className="space-y-2">
+        <li>🚫 <b>Video must still be up when we check Monday.</b> TikTok & IG take down cannabis stuff a lot. If it's gone, it doesn't count.</li>
         <li>🧢 <b>No cap on views.</b> We verify every number. Fake numbers = you're out, no second chances.</li>
         <li>🔁 <b>One link, one submission.</b> No double dipping.</li>
+        <li>⏰ <b>Late = locked.</b> Videos not submitted by Sunday 11:59pm don't count for that week.</li>
       </ul>
-    </div>
-
-    <div>
-      <h3 className="font-arcade text-lg mb-2">💰 How you get paid</h3>
-      <p className="mb-2">Every week, your views turn into cash. The more you get, the higher your level:</p>
-      <div className="space-y-1">
-        {RATE_BANDS.map((b, i) => (
-          <div key={i} className="flex justify-between border-b border-[var(--border)] py-1.5">
-            <span>{LEVELS[i].emoji} {LEVELS[i].name} <span className="text-[var(--text-dim)]">({bandLabel(i)} views)</span></span>
-            <b>{fmtCash(b.per10k)} / 10K</b>
-          </div>
-        ))}
-        <p className="text-xs text-[var(--text-dim)] pt-1">e.g. 100K = {fmtCash(payForViews(100_000))} · 500K = {fmtCash(payForViews(500_000))} · 1M = {fmtCash(payForViews(1_000_000))} · max {fmtCash(WEEKLY_CAP)}/week</p>
-        <div className="flex justify-between border-b border-[var(--border)] py-1.5 pt-3"><span>😎 Mad Labs logo as your pfp</span><b>+{fmtCash(LOGO_PFP_BONUS)}/week</b></div>
-        <div className="flex justify-between border-b border-[var(--border)] py-1.5"><span>🎁 {REUP_VIDEOS} videos in 2 weeks</span><b>Free re-up</b></div>
-        {MILESTONES.map((ms) => (
-          <div key={ms.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{ms.emoji} {fmtViews(ms.views)} total views</span><b>{ms.label}</b></div>
-        ))}
-        {MONTHLY_PRIZES.map((p) => (
-          <div key={p.views} className="flex justify-between border-b border-[var(--border)] py-1.5"><span>{p.emoji} {fmtViews(p.views)} views in a month</span><b>{p.label}</b></div>
-        ))}
-      </div>
-    </div>
+    </Sec>
   </div>
 );
 
 // Drag the knob all the way right to agree. Keyboard: focus the knob, press → or Enter.
-const SlideToAgree = ({ onDone, label = 'Slide to agree' }) => {
+const SlideToAgree = ({ onDone, label = 'Slide to agree', locked = false }) => {
   const track = useRef(null);
   const startX = useRef(0);
   const [x, setX] = useState(0);
@@ -983,12 +993,13 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree' }) => {
     <div ref={track} className="relative h-[72px] rounded-full bg-[var(--elev2)] border-[2.5px] border-[var(--ink)] overflow-hidden select-none touch-none">
       <div className="absolute inset-y-0 left-0 bg-[var(--lime)]" style={{ width: x + KNOB + 8, transition: drag ? 'none' : 'width .3s' }} />
       <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-[var(--text-dim)] pointer-events-none">
-        {done ? "You're in 🤝" : <>{label} <span className="ml-2 slide-hint">→→</span></>}
+        {done ? "You're in 🤝" : locked ? '🔒 Scroll to the end to unlock' : <>{label} <span className="ml-2 slide-hint">→→</span></>}
       </div>
       <button
         type="button"
         aria-label={label}
-        className="absolute top-[5px] left-[4px] w-14 h-14 rounded-full bg-[var(--ink)] text-[var(--bg)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
+        disabled={locked}
+        className="absolute top-[5px] left-[4px] w-14 h-14 rounded-full disabled:opacity-30 bg-[var(--ink)] text-[var(--bg)] flex items-center justify-center cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--grape)]"
         style={{ transform: `translateX(${x}px)`, transition: drag ? 'none' : 'transform .3s' }}
         onPointerDown={(e) => { if (done) return; setDrag(true); startX.current = e.clientX - x; e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { if (drag) setX(Math.max(0, Math.min(max(), e.clientX - startX.current))); }}
@@ -1003,6 +1014,13 @@ const SlideToAgree = ({ onDone, label = 'Slide to agree' }) => {
 
 const RulesGate = ({ user, onAccept }) => {
   const [error, setError] = useState('');
+  const [readAll, setReadAll] = useState(false);
+  const body = useRef(null);
+  const checkEnd = () => {
+    const el = body.current;
+    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setReadAll(true);
+  };
+  useEffect(() => { checkEnd(); }, []);
   const accept = async () => {
     setError('');
     try { await onAccept(); } catch (e) { setError(friendlyError(e)); }
@@ -1011,15 +1029,15 @@ const RulesGate = ({ user, onAccept }) => {
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6">
       <div className="stk w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-b-none sm:rounded-[24px] bg-[var(--bg)] pop-in">
         <div className="px-6 pt-6 pb-3">
-          <h2 className="font-arcade text-3xl mt-1">The rules, {(user.name || '').split(' ')[0] || 'fam'} 📜</h2>
-          <p className="text-sm text-[var(--text-dim)] mt-1">Quick read. Promise it's worth it. 💸</p>
+          <h2 className="font-arcade text-3xl mt-1">Welcome, {(user.name || '').split(' ')[0] || 'fam'} 👋</h2>
+          <p className="text-sm text-[var(--text-dim)] mt-1">Read how it works and the rules, then slide to agree.</p>
         </div>
-        <div className="px-6 overflow-y-auto flex-1">
+        <div ref={body} onScroll={checkEnd} className="px-6 pb-6 overflow-y-auto flex-1">
           <RulesContent />
         </div>
         <div className="p-6 pt-4 border-t border-[var(--border)]">
-          <p className="text-xs text-[var(--text-dim)] mb-3 text-center">By sliding, you agree to all the rules above. ✅</p>
-          <SlideToAgree onDone={accept} label="Slide to agree" />
+          <p className="text-xs text-[var(--text-dim)] mb-3 text-center">By sliding, you confirm you read it all and agree. ✅</p>
+          <SlideToAgree onDone={accept} label="I read it all & agree" locked={!readAll} />
           {error && <p className="text-xs text-[var(--danger)] mt-3 text-center font-semibold">{error}</p>}
         </div>
       </div>
@@ -1028,22 +1046,6 @@ const RulesGate = ({ user, onAccept }) => {
 };
 
 // ────────────────────────── GAME LAYER ──────────────────────────
-// Weekly pay bands shown as levels.
-const LEVELS = [
-  { name: 'Warming up', emoji: '🌱' },
-  { name: 'Heating up', emoji: '🔥' },
-  { name: 'Going viral', emoji: '🚀' },
-  { name: 'Legend', emoji: '👑' },
-];
-const levelIndex = (views) => {
-  const i = RATE_BANDS.findIndex((b) => views < b.upTo);
-  return i === -1 ? RATE_BANDS.length - 1 : i;
-};
-const bandLabel = (i) => {
-  const b = RATE_BANDS[i];
-  const lo = i === 0 ? 0 : RATE_BANDS[i - 1].upTo;
-  return b.upTo === Infinity ? `${fmtViews(lo)}+` : `${fmtViews(lo)}–${fmtViews(b.upTo)}`;
-};
 const fmtCash = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
 // Ticks a number up from 0 once on mount (skipped for reduced motion).
@@ -1108,8 +1110,8 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
   const reup = computeReup(subs, today, true);
   const life = lifetimeViews(subs, undefined, true);
   const paidTotal = payouts.reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const lvl = levelIndex(w.views);
-  const band = RATE_BANDS[lvl];
+  const lvl = levelFor(w.views);
+  const nextLvl = LEVELS[lvl + 1] || null;
   const bag = useCountUp(w.pay);
   const [party, setParty] = useState(null);
   const examples = deal?.examples || [];
@@ -1117,8 +1119,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
   // segmented progress: each level is one segment, filled by views within it
   const segFill = (i) => {
-    const lo = i === 0 ? 0 : RATE_BANDS[i - 1].upTo;
-    const hi = RATE_BANDS[i].upTo === Infinity ? CAP_VIEWS : RATE_BANDS[i].upTo;
+    const lo = LEVELS[i].at, hi = LEVELS[i + 1].at;
     return Math.max(0, Math.min(1, (w.views - lo) / (hi - lo)));
   };
 
@@ -1126,8 +1127,8 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
     await onSubmit(data);
     const after = computeWeek([...subs, { posted: data.postedAt, status: 'pending', views: 0, claimedViews: data.claimedViews }], weekStart(data.postedAt), true);
     const before = computeWeek(subs, weekStart(data.postedAt), true);
-    const newLvl = levelIndex(after.views);
-    setParty({ added: Math.max(0, after.pay - before.pay), level: newLvl, levelUp: newLvl > levelIndex(before.views) });
+    const newLvl = levelFor(after.views);
+    setParty({ added: Math.max(0, after.pay - before.pay), level: newLvl, levelUp: newLvl > levelFor(before.views) });
   };
 
   return (
@@ -1135,7 +1136,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       {party && <DropCelebration data={party} onClose={() => setParty(null)} />}
 
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <h1 className="font-arcade text-3xl md:text-4xl leading-none">yo {user.name.split(' ')[0]} 👋</h1>
+        <h1 className="font-arcade text-3xl md:text-4xl leading-none">Welcome back, {user.name.split(' ')[0]}.</h1>
         <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'bg-[var(--sun)] text-black' : 'bg-[var(--elev1)]'}`}>
           <span className="mr-1.5">⏰</span>{lastCall ? 'Last call: closes tonight 11:59pm' : 'Submit by Sat 11:59pm'}
         </span>
@@ -1145,31 +1146,40 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       <section className="stk bg-[var(--lime)] text-black p-6 md:p-8" aria-label="This week's earnings">
         <div className="flex items-start justify-between gap-3">
           <p className="font-bold">This week's bag 💰</p>
-          <span className="stk-chip bg-white px-3 py-1 text-sm font-bold whitespace-nowrap"><span className="mr-1.5">{w.capped ? '💎' : LEVELS[lvl].emoji}</span>{w.capped ? 'Maxed out' : LEVELS[lvl].name}</span>
+          <span className="stk-chip bg-white px-3 py-1 text-sm font-bold whitespace-nowrap"><span className="mr-1.5">{LEVELS[lvl].emoji}</span>{LEVELS[lvl].name}</span>
         </div>
         <div className="font-arcade text-[64px] md:text-[88px] leading-[0.95] mt-3 tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
         <p className="mt-2 font-semibold">{nf(w.views)} views · {w.videos} video{w.videos === 1 ? '' : 's'} this week</p>
 
-        <div className="mt-5 grid grid-cols-4 gap-1.5" role="img" aria-label={`Level ${lvl + 1} of 4`}>
-          {RATE_BANDS.map((_, i) => (
+        <div className="mt-5 grid grid-cols-3 gap-1.5" role="img" aria-label={`${LEVELS[lvl].name}: ${nf(w.views)} of ${nf(CAP_VIEWS)} views`}>
+          {LEVELS.slice(0, -1).map((l, i) => (
             <div key={i}>
               <div className="h-4 rounded-full border-2 border-black bg-white/60 overflow-hidden">
                 <div className="h-full bg-black rounded-full transition-[width] duration-700" style={{ width: `${segFill(i) * 100}%` }} />
               </div>
-              <div className="text-[11px] font-bold mt-1.5 leading-tight"><span className="block text-base">{LEVELS[i].emoji}</span>{bandLabel(i)}</div>
+              <div className="text-[11px] font-bold mt-1.5 leading-tight"><span className="mr-1">{LEVELS[i + 1].emoji}</span>{fmtViews(LEVELS[i + 1].at)}</div>
             </div>
           ))}
         </div>
 
         <p className="mt-4 text-sm font-semibold">
-          {w.capped
-            ? `You hit the ${fmtCash(WEEKLY_CAP)} max this week. Absolute legend 👑`
-            : `Every 10K views right now = +${fmtCash(band.per10k)} 💸`}
+          {nextLvl
+            ? `${fmtViews(nextLvl.at - w.views)} more views to ${nextLvl.emoji} ${nextLvl.name}. Every 100K = ${fmtCash(PAY_PER_100K)} 💸`
+            : `You maxed out this week. Absolute legend 👑`}
         </p>
         <p className="mt-1 text-xs opacity-70">Uses the views you entered. Final after we check on Monday.</p>
       </section>
 
       <a href="#drop" className="stk-btn flex items-center justify-center gap-2 h-16 bg-[var(--ink)] text-[var(--bg)] font-arcade text-xl"><span>📲</span><span>Drop a video</span></a>
+
+      {/* weekly max — its own section */}
+      <section className="stk bg-[var(--elev1)] p-5 flex items-center gap-4" aria-label="Weekly max">
+        <div className="text-4xl">💎</div>
+        <div className="min-w-0">
+          <div className="font-arcade text-lg leading-tight">Weekly max: {fmtCash(WEEKLY_CAP)}</div>
+          <p className="text-sm text-[var(--text-dim)] mt-0.5">That's {fmtViews(CAP_VIEWS)} views. Anything past that still counts toward free merch and the big prizes.</p>
+        </div>
+      </section>
 
       {/* side quests */}
       <section aria-label="Bonuses">
@@ -1412,7 +1422,7 @@ const SubmissionRow = ({ sub }) => {
 const CreatorRewards = () => (
   <div className="space-y-8 md:space-y-10">
     <div className="anim-fade-up">
-      <h1 className="font-arcade text-4xl md:text-5xl mt-2">The rules 📜</h1>
+      <h1 className="font-arcade text-4xl md:text-5xl mt-2">The deal 🤝</h1>
       <p className="mt-3 text-[var(--text-dim)] max-w-md">Everything you agreed to, in one place. 📌</p>
     </div>
     <div className="stk bg-[var(--elev1)] p-6 md:p-8 max-w-2xl">

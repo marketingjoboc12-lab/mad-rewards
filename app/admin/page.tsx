@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  RATE_BANDS, WEEKLY_CAP, CAP_VIEWS, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
+  PAY_PER_100K, WEEKLY_CAP, CAP_VIEWS, LOGO_PFP_BONUS, REUP_VIDEOS, MILESTONES, MONTHLY_PRIZES,
   computeWeek, computeMonth, computeReup, lifetimeViews, milestonesReached, payForViews, lastClosedWeek, weekStart, monthStart, addDays,
   weekLabel, monthLabel, todayLocal, type SubLike,
 } from '@/lib/rewards'
@@ -458,13 +458,8 @@ export default function AdminPage() {
               <p className="muted" style={{ marginTop: 4 }}>These numbers live in <code>lib/rewards.ts</code>. Creators see the same ones.</p>
               <div className="rules-grid">
                 <div>
-                  <div className="flabel">Weekly pay (each band at its own rate)</div>
-                  {RATE_BANDS.map((b, i) => (
-                    <div key={i} className="rule-row">
-                      <span>{i === 0 ? `First ${num(b.upTo)}` : b.upTo === Infinity ? `Over ${num(RATE_BANDS[i - 1].upTo)}` : `${num(RATE_BANDS[i - 1].upTo)} → ${num(b.upTo)}`} views</span>
-                      <b>${b.per10k} per 10K</b>
-                    </div>
-                  ))}
+                  <div className="flabel">Weekly pay</div>
+                  <div className="rule-row"><span>Every 100,000 verified views</span><b>{money(PAY_PER_100K)}</b></div>
                   <div className="rule-row"><span>Weekly cap (hit at {num(CAP_VIEWS)} views)</span><b>{money(WEEKLY_CAP)}</b></div>
                   {[100_000, 500_000, 1_000_000].map((v) => <div key={v} className="rule-row"><span>e.g. {num(v)} views</span><b>{money(payForViews(v))}</b></div>)}
                 </div>

@@ -10,22 +10,25 @@
 //  morning; Sunday is a grace day. Employee verifies Monday.
 // ============================================================
 
-export type RateBand = { upTo: number; per10k: number }
 export type Milestone = { views: number; label: string; emoji: string }
 export type MonthlyPrize = { views: number; label: string; emoji: string }
 
-// Weekly pay, tax-bracket style: each band of views pays its own rate,
-// so more views ALWAYS means more money (nobody aims for 490K over 500K).
-//   100K = $100 · 250K = $212.50 · 500K = $400 · 1M = $650 · 2M = $900
-export const RATE_BANDS: RateBand[] = [
-  { upTo: 100_000, per10k: 10 },
-  { upTo: 500_000, per10k: 7.5 },
-  { upTo: 1_000_000, per10k: 5 },
-  { upTo: Infinity, per10k: 2.5 },
-]
+// Weekly pay: flat $100 for every 100K views (views from all that week's videos add up).
+export const PAY_PER_100K = 100
 
 // Most anyone can earn from views in one week (logo bonus is on top).
 export const WEEKLY_CAP = 1000
+
+// Weekly levels, just for fun (no effect on pay).
+export const LEVELS = [
+  { at: 0, name: 'Warming up', emoji: '🌱' },
+  { at: 100_000, name: 'Heating up', emoji: '🔥' },
+  { at: 500_000, name: 'Going viral', emoji: '🚀' },
+  { at: 1_000_000, name: 'Maxed out', emoji: '👑' },
+]
+
+// Creators must re-accept "How it works" if they accepted before this date.
+export const RULES_UPDATED = '2026-10-09T00:00:00Z'
 
 // Flat weekly bonus when their profile pic is the Mad Labs logo.
 // Employee ticks a box on Monday when checking.
@@ -104,20 +107,18 @@ const counts = (s: SubLike, estimate: boolean) =>
   s.status === 'approved' || s.status === 'paid' || (estimate && s.status === 'pending')
 
 // Dollars earned for a week's views (before the cap).
-export const rawPayForViews = (views: number) => {
-  let left = Math.max(0, views), floor = 0, pay = 0
-  for (const b of RATE_BANDS) {
-    const inBand = Math.min(left, b.upTo - floor)
-    pay += (inBand / 10_000) * b.per10k
-    left -= inBand; floor = b.upTo
-    if (left <= 0) break
-  }
-  return Math.round(pay * 100) / 100
-}
+export const rawPayForViews = (views: number) => Math.round((Math.max(0, views) / 100_000) * PAY_PER_100K * 100) / 100
 export const payForViews = (views: number) => Math.min(WEEKLY_CAP, rawPayForViews(views))
 
-// Views needed to reach the cap (≈2.4M).
-export const CAP_VIEWS = (() => { let v = 0; while (rawPayForViews(v) < WEEKLY_CAP) v += 10_000; return v })()
+// Views needed to reach the cap (1M).
+export const CAP_VIEWS = (WEEKLY_CAP / PAY_PER_100K) * 100_000
+
+// Index into LEVELS for a week's views.
+export const levelFor = (views: number) => {
+  let i = 0
+  LEVELS.forEach((l, idx) => { if (views >= l.at) i = idx })
+  return i
+}
 
 export const prizeFor = (views: number) =>
   [...MONTHLY_PRIZES].reverse().find((p) => views >= p.views) || null
