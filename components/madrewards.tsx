@@ -783,7 +783,7 @@ const InvitePage = ({ go, onValid, initialCode = '' }) => {
 };
 
 const SignupPage = ({ go, code, onSignup }) => {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', cashapp: '', password: '', tiktok: '', instagram: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', cashapp: '', password: '', confirm: '', tiktok: '', instagram: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const up = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -791,6 +791,7 @@ const SignupPage = ({ go, code, onSignup }) => {
     e.preventDefault(); setError('');
     if (!form.name || !form.email || !form.password) { setError('Name, email and password are required.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
     if (form.phone && form.phone.replace(/\D/g, '').length !== 10) { setError('Enter a 10-digit phone number, like (555) 000-0000.'); return; }
     setBusy(true);
     try { await onSignup({ ...form, code }); }
@@ -810,7 +811,8 @@ const SignupPage = ({ go, code, onSignup }) => {
           <Field label="Phone" icon={Phone} type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="(555) 000-0000" value={form.phone} onChange={(e) => up('phone', fmtPhone(e.target.value))} />
           <Field label="Cash App" icon={DollarSign} placeholder="$yourcashtag" value={form.cashapp} onChange={(e) => up('cashapp', e.target.value)} />
         </div>
-        <Field label="Password" icon={Lock} type="password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
+        <Field label="Password" icon={Lock} type="password" autoComplete="new-password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
+        <Field label="Confirm password" icon={Lock} type="password" autoComplete="new-password" placeholder="Type it again" value={form.confirm} onChange={(e) => up('confirm', e.target.value)} error={form.confirm && form.confirm !== form.password ? "Passwords don't match" : undefined} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="TikTok" icon={AtSign} placeholder="@you" value={form.tiktok} onChange={(e) => up('tiktok', e.target.value)} />
           <Field label="Instagram" icon={AtSign} placeholder="@you" value={form.instagram} onChange={(e) => up('instagram', e.target.value)} />
