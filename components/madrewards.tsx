@@ -77,6 +77,15 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const fmtDay = (d) => (d ? `${MONTHS_SHORT[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}` : '—');
 const fmtViews = (n) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}K` : String(n));
 const toUrl = (u) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
+// US phone: keeps max 10 digits and shows them as (432) 432-4324 while typing.
+const fmtPhone = (raw) => {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 11 && d.startsWith('1')) d = d.slice(1);
+  d = d.slice(0, 10);
+  if (d.length < 4) return d.length ? `(${d}` : '';
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+};
 const fmtDateFull = (s) => new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 const detectPlatform = (url) => {
@@ -762,6 +771,7 @@ const SignupPage = ({ go, code, onSignup }) => {
     e.preventDefault(); setError('');
     if (!form.name || !form.email || !form.password) { setError('Name, email and password are required.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (form.phone && form.phone.replace(/\D/g, '').length !== 10) { setError('Enter a 10-digit phone number, like (555) 000-0000.'); return; }
     setBusy(true);
     try { await onSignup({ ...form, code }); }
     catch (err) { setError(err?.message || 'Could not create your account.'); }
@@ -777,7 +787,7 @@ const SignupPage = ({ go, code, onSignup }) => {
         <Field label="Full name" icon={UserIcon} placeholder="Maya Okafor" value={form.name} onChange={(e) => up('name', e.target.value)} />
         <Field label="Email" icon={Mail} type="email" placeholder="you@email.com" value={form.email} onChange={(e) => up('email', e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Phone" icon={Phone} type="tel" placeholder="+1 555 000 0000" value={form.phone} onChange={(e) => up('phone', e.target.value)} />
+          <Field label="Phone" icon={Phone} type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="(555) 000-0000" value={form.phone} onChange={(e) => up('phone', fmtPhone(e.target.value))} />
           <Field label="Cash App" icon={DollarSign} placeholder="$yourcashtag" value={form.cashapp} onChange={(e) => up('cashapp', e.target.value)} />
         </div>
         <Field label="Password" icon={Lock} type="password" placeholder="At least 6 characters" value={form.password} onChange={(e) => up('password', e.target.value)} />
@@ -948,7 +958,7 @@ const RulesContent = () => (
 
       <div>
         <div className="font-bold mb-1">📈 Your views stack</div>
-        <p>Every video you post that week adds into one total. 10 videos × 10K views = 100K = {fmtCash(PAY_PER_100K)}. Your all-time views keep stacking toward free merch, and your monthly views toward the big prizes.</p>
+        <p>Every video you post that week adds into one total. Example: 10 videos × 10K views = 100K = {fmtCash(PAY_PER_100K)}. Your all-time views keep stacking toward free merch, and your monthly views toward the big prizes.</p>
       </div>
 
       <div>

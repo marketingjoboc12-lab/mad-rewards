@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       user_metadata: { name },
     })
     if (created.error) {
-      const msg = /already/i.test(created.error.message) ? 'That email already has an account. Try logging in.' : created.error.message
+      const msg = /already/i.test(created.error.message) ? 'That email already has an account. Log in instead, or use a different email.' : created.error.message
       return NextResponse.json({ error: msg }, { status: 400 })
     }
     const uid = created.data.user?.id
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     if (crow.error) {
       // roll back the auth user so they can retry cleanly
       await admin.auth.admin.deleteUser(uid).catch(() => {})
-      const msg = crow.error.code === '23505' ? 'That email is already registered.' : crow.error.message
+      const msg = crow.error.code === '23505' ? 'That email already has an account. Log in instead, or use a different email.' : crow.error.message
       return NextResponse.json({ error: msg }, { status: 400 })
     }
 
