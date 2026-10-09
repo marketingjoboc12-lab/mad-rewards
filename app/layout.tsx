@@ -3,8 +3,8 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'MAD Vault — Influencer Rewards Portal',
-  description: 'A private rewards portal for creators who post for our brand. Take a weekly challenge, hit the metrics, get paid.',
+  title: 'Mad Rewards',
+  description: 'Invite-only creator rewards.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -15,10 +15,6 @@ export const metadata: Metadata = {
       {
         url: '/icon-dark-32x32.png',
         media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
       },
     ],
     apple: '/apple-icon.png',

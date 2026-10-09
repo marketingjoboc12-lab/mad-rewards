@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 
   // ---- list everything ----
   if (body.action === 'list') {
-    const [creators, submissions, campaigns, invites, requests, payouts, announcements] = await Promise.all([
+    const [creators, submissions, campaigns, invites, requests, payouts, announcements, messages] = await Promise.all([
       admin.from('creators').select('*').order('created_at', { ascending: false }),
       admin.from('video_submissions').select('*').order('created_at', { ascending: false }),
       admin.from('campaigns').select('*').order('created_at', { ascending: false }),
@@ -86,6 +86,7 @@ export async function POST(req: Request) {
       admin.from('signup_requests').select('*').order('created_at', { ascending: false }),
       admin.from('payouts').select('*').order('paid_at', { ascending: false }),
       admin.from('announcements').select('*').order('created_at', { ascending: false }),
+      admin.from('messages').select('*').order('created_at', { ascending: false }),
     ])
     const err = creators.error || submissions.error || campaigns.error || invites.error || requests.error || payouts.error
     if (err) return NextResponse.json({ error: err.message }, { status: 500 })
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
       requests: requests.data,
       payouts: payouts.data,
       announcements: announcements.error ? [] : announcements.data,
+      messages: messages.error ? [] : messages.data,
       emailReady: emailConfigured(),
       smsReady: smsConfigured(),
     })
@@ -192,6 +194,13 @@ export async function POST(req: Request) {
       texted = rs.filter(Boolean).length
     }
     return NextResponse.json({ ok: true, emailed, texted })
+  }
+
+  if (body.action === 'message_handled') {
+    if (!body.id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    const { error } = await admin.from('messages').update({ handled: !!body.handled }).eq('id', body.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: true })
   }
 
   if (body.action === 'announcement_hide') {

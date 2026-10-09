@@ -24,6 +24,7 @@ type Campaign = {
 }
 type Payout = { id: string; creator_id: string; period: 'week' | 'month'; period_start: string; amount: number; label: string | null; details: any; paid_at: string }
 type Invite = { id: string; code: string; note: string | null; used: boolean; used_email: string | null; created_at: string; used_at: string | null }
+type Msg = { id: string; creator_id: string; topic: string; body: string; handled: boolean; created_at: string }
 type Announcement = { id: string; title: string; body: string | null; active: boolean; created_at: string }
 type ReqRow = { id: string; name: string; email: string; tiktok_handle: string | null; instagram_handle: string | null; note: string | null; status: string; invite_code: string | null; created_at: string }
 
@@ -95,8 +96,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests' | 'announce'>('overview')
+  const [tab, setTab] = useState<'overview' | 'payouts' | 'campaign' | 'creators' | 'submissions' | 'invites' | 'requests' | 'announce' | 'messages'>('overview')
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [messages, setMessages] = useState<Msg[]>([])
   const [ready, setReady] = useState({ email: false, sms: false })
   const [ann, setAnn] = useState({ title: '', body: '', banner: true, email: true, sms: true })
   const [annMsg, setAnnMsg] = useState('')
@@ -126,6 +128,7 @@ export default function AdminPage() {
     setRequests(data.requests ?? [])
     setPayouts(data.payouts ?? [])
     setAnnouncements(data.announcements ?? [])
+    setMessages(data.messages ?? [])
     setReady({ email: !!data.emailReady, sms: !!data.smsReady })
   }
 
@@ -296,7 +299,7 @@ export default function AdminPage() {
       <div className="madx madx-center" style={vars}>
         <style>{CSS}</style>
         <div className="card login">
-          <div className="brand login-brand"><span className="brand-mark" />MAD <b>REWARDS</b></div>
+          <div className="brand login-brand"><img src={dark ? '/logo-dark.png' : '/logo-light.png'} alt="Mad Rewards" style={{ height: 44 }} /></div>
           <h1 className="login-h1">Admin access</h1>
           <p className="muted">Sign in to continue.</p>
           <form onSubmit={login} style={{ marginTop: 18 }}>
@@ -379,10 +382,11 @@ export default function AdminPage() {
     { id: 'requests', label: 'Requests', d: Ico.inbox, badge: pendingReqs || undefined },
     { id: 'invites', label: 'Invites', d: Ico.ticket, badge: unusedInvites || undefined },
     { id: 'announce', label: 'Announcements', d: Ico.spark, badge: undefined },
+    { id: 'messages', label: 'Messages', d: Ico.inbox, badge: messages.filter((m) => !m.handled).length || undefined },
     { id: 'creators', label: 'Creators', d: Ico.users, badge: creators.length || undefined },
   ] as const
 
-  const titleFor: Record<string, string> = { overview: 'Overview', payouts: 'Weekly pay', campaign: 'Rewards', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests', announce: 'Announcements' }
+  const titleFor: Record<string, string> = { overview: 'Overview', payouts: 'Weekly pay', campaign: 'Rewards', creators: 'Creators', submissions: 'Video submissions', invites: 'Invite codes', requests: 'Signup requests', announce: 'Announcements', messages: 'Messages from creators' }
 
   return (
     <div className="madx" style={vars}>
@@ -390,7 +394,7 @@ export default function AdminPage() {
 
       {/* ---------- SIDEBAR ---------- */}
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark" />MAD <b>REWARDS</b></div>
+        <div className="brand"><img src={dark ? '/logo-dark.png' : '/logo-light.png'} alt="Mad Rewards" style={{ height: 40 }} /></div>
         <nav className="nav">
           {nav.map((n) => (
             <button key={n.id} onClick={() => setTab(n.id as any)} className={`navbtn${tab === n.id ? ' active' : ''}`}>
@@ -817,6 +821,34 @@ export default function AdminPage() {
                   </tr>
                 ))}
                 {requests.length === 0 && <tr><td className="empty" colSpan={8}>No signup requests yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ===== MESSAGES ===== */}
+        {tab === 'messages' && (
+          <div className="card table-scroll">
+            <table className="tbl">
+              <thead><tr><th>From</th><th>Type</th><th>Message</th><th>Sent</th><th></th></tr></thead>
+              <tbody>
+                {messages.map((m) => {
+                  const c = creatorFor(m.creator_id)
+                  return (
+                    <tr key={m.id} style={{ opacity: m.handled ? 0.55 : 1 }}>
+                      <td style={{ fontWeight: 600 }}>{c?.name || 'Unknown'}<div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{c?.email}</div></td>
+                      <td><span className={`pill ${m.topic === 'problem' ? 'rejected' : m.topic === 'question' ? 'pending' : 'approved'}`} style={{ textTransform: 'capitalize' }}>{m.topic}</span></td>
+                      <td style={{ maxWidth: 420, whiteSpace: 'pre-wrap' }}>{m.body}</td>
+                      <td className="muted">{fmtDate(m.created_at)}</td>
+                      <td>
+                        <button className="btn btn-ghost sm" onClick={async () => { try { await call({ action: 'message_handled', id: m.id, handled: !m.handled }); await load() } catch (err: any) { setError(err.message) } }}>
+                          {m.handled ? 'Reopen' : 'Mark done'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {messages.length === 0 && <tr><td className="empty" colSpan={5}>No messages yet.</td></tr>}
               </tbody>
             </table>
           </div>
