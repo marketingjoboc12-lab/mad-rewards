@@ -293,6 +293,17 @@ const ThemeStyles = () => (
     .rank { width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; font-family: 'Fredoka', sans-serif; font-weight: 700; flex-shrink: 0; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .tilt-l, .tilt-r { transform: none; }
+    .prize-card { transition: transform .2s var(--ease), box-shadow .2s var(--ease); box-shadow: 0 12px 26px -16px rgba(30,60,140,.35); }
+    .prize-card:hover { transform: translateY(-4px) rotate(-.6deg); box-shadow: 0 22px 34px -16px rgba(30,60,140,.45); }
+    .prize-card:active { transform: scale(.98); }
+    .prize-card:focus-visible { outline: 3px solid #3F7BE6; outline-offset: 3px; }
+    @keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    .grow-bar { transform-origin: left; animation: growBar .9s var(--ease) both .15s; }
+    @keyframes shineSweep { 0% { transform: translateX(-120%) skewX(-18deg); } 100% { transform: translateX(220%) skewX(-18deg); } }
+    .shine-once { position: relative; overflow: hidden; }
+    .shine-once::before { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: shineSweep 1.4s var(--ease) .4s both; pointer-events: none; z-index: 1; }
+    .lift { transition: transform .18s var(--ease); } .lift:hover { transform: translateY(-2px); }
+    @media (prefers-reduced-motion: reduce) { .grow-bar, .shine-once::before { animation: none; } .prize-card:hover { transform: none; } }
     @keyframes popIn { 0% { transform: scale(.7); opacity: 0 } 70% { transform: scale(1.04); opacity: 1 } 100% { transform: scale(1) } }
     .pop-in { animation: popIn .45s var(--ease) both; }
     @keyframes confettiFall { 0% { transform: translateY(-40px) rotate(0); opacity: 0 } 15% { opacity: 1 } 100% { transform: translateY(420px) rotate(320deg); opacity: 0 } }
@@ -1176,15 +1187,6 @@ const Confetti = () => {
   );
 };
 
-// The Mad Labs "M", drawn as a path so it can sit inside the emblem.
-const MadM = ({ className = '' }) => (
-  <svg viewBox="0 0 100 100" className={className} aria-hidden>
-    <path fill="currentColor" d="M10 10 L50 57 L90 10 L90 33 Q90 40 85 46 L50 88 L15 46 Q10 40 10 33 Z" />
-    <path fill="currentColor" d="M30 77 L19 62 Q13 58 9.5 66 Q6.5 79 17 83 Q25.5 85.5 30 77 Z" />
-    <path fill="currentColor" d="M70 77 L81 62 Q87 58 90.5 66 Q93.5 79 83 83 Q74.5 85.5 70 77 Z" />
-  </svg>
-);
-
 // Glossy winged badge with the M, like a game rank emblem.
 const MEmblem = ({ size = 132 }) => (
   <svg width={size} height={size} viewBox="0 0 160 160" aria-hidden className="drop-shadow-[0_14px_22px_rgba(30,70,170,.35)]">
@@ -1201,7 +1203,7 @@ const MEmblem = ({ size = 132 }) => (
     <path d="M80 14 L132 44 L132 104 L80 134 L28 104 L28 44 Z" fill="url(#emHex)" stroke="#fff" strokeOpacity=".85" strokeWidth="3" />
     <path d="M80 30 L118 52 L118 96 L80 118 L42 96 L42 52 Z" fill="url(#emInner)" stroke="#CFE6FF" strokeOpacity=".9" strokeWidth="2" />
     <path d="M80 14 L132 44 L132 70 Q80 58 28 70 L28 44 Z" fill="url(#emShine)" />
-    <g transform="translate(55 49) scale(.5)" color="#fff"><MadM /></g>
+    <image href="/m-logo-white.png" x="52" y="46" width="56" height="56" />
     <path d="M80 4 L90 14 L80 22 L70 14 Z" fill="#F4D7A8" stroke="#fff" strokeWidth="1.5" />
   </svg>
 );
@@ -1257,9 +1259,10 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
   // every reward in one swipeable row
   const prizes = [
-    ...MILESTONES.map((ms, i) => ({ key: 'm' + i, emoji: ms.emoji, image: ms.image, label: ms.label, need: `${fmtViews(ms.views)} total`, got: life >= ms.views, toGo: ms.views - life, grad: i === 0 ? 'g-sky' : 'g-sun' })),
-    ...MONTHLY_PRIZES.map((p, i) => ({ key: 'p' + i, emoji: p.emoji, image: p.image, label: p.label, need: `${fmtViews(p.views)} this month`, got: m.views >= p.views, toGo: p.views - m.views, grad: i === 0 ? 'g-grape' : 'g-gum' })),
-  ];
+    ...MILESTONES.map((ms, i) => ({ key: 'm' + i, emoji: ms.emoji, image: ms.image, label: ms.label, kind: 'Free merch', need: `${fmtViews(ms.views)} total views`, how: 'Unlocks with your total views since you joined. Shipped to you once.', have: life, goal: ms.views, got: life >= ms.views, grad: i === 0 ? 'g-sky' : 'g-sun' })),
+    ...MONTHLY_PRIZES.map((p, i) => ({ key: 'p' + i, emoji: p.emoji, image: p.image, label: p.label, kind: 'Monthly prize', need: `${fmtViews(p.views)} in one month`, how: `Hit ${fmtViews(p.views)} views in a single calendar month. Resets on the 1st.`, have: m.views, goal: p.views, got: m.views >= p.views, grad: i === 0 ? 'g-grape' : 'g-gum' })),
+  ].map((p) => ({ ...p, pct: Math.min(100, Math.round((p.have / p.goal) * 100)) }));
+  const [openPrize, setOpenPrize] = useState(null);
   const top3 = (board || []).slice(0, 3);
   const rest = (board || []).slice(3);
   const meRow = (board || []).find((r) => r.me);
@@ -1268,6 +1271,34 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
+      {openPrize && (
+        <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => setOpenPrize(null)}>
+          <div className="stk w-full sm:max-w-md overflow-hidden rounded-b-none sm:rounded-[28px] pop-in" role="dialog" aria-modal="true" aria-label={openPrize.label} onClick={(e) => e.stopPropagation()}>
+            <div className={`relative ${openPrize.grad} aspect-[4/3]`}>
+              {openPrize.image
+                ? <img src={openPrize.image} alt={openPrize.label} className="absolute inset-0 w-full h-full object-cover" />
+                : <span className="absolute inset-0 grid place-items-center text-7xl" aria-hidden>{openPrize.emoji}</span>}
+              <button onClick={() => setOpenPrize(null)} className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/45 text-white grid place-items-center" aria-label="Close"><X size={18} /></button>
+            </div>
+            <div className="p-6">
+              <span className="text-xs font-bold text-[#3F7BE6]">{openPrize.kind}</span>
+              <h3 className="font-arcade text-2xl mt-1">{openPrize.label}</h3>
+              <p className="text-sm text-[var(--text-dim)] mt-1.5">{openPrize.how}</p>
+              <div className="mt-5 flex items-end justify-between">
+                <div className="font-arcade text-3xl">{openPrize.pct}%</div>
+                <div className="text-sm text-[var(--text-dim)]">{nf(openPrize.have)} / {nf(openPrize.goal)} views</div>
+              </div>
+              <div className="mt-2 h-3 rounded-full bg-[var(--elev2)] overflow-hidden">
+                <div className="h-full rounded-full g-blue grow-bar" style={{ width: `${Math.max(openPrize.pct, 3)}%` }} />
+              </div>
+              <p className="mt-3 text-sm font-semibold">
+                {openPrize.got ? "You've unlocked this. We'll reach out to get it to you." : `${nf(openPrize.goal - openPrize.have)} more views to go.`}
+              </p>
+              <button onClick={() => { setOpenPrize(null); setView('drop'); }} className="stk-btn mt-5 w-full h-13 py-3.5 font-bold">Drop your videos</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <h1 className="font-arcade text-3xl md:text-4xl leading-none">Welcome back, {user.name.split(' ')[0]}.</h1>
         <span className={`stk-chip px-3 py-1.5 text-xs font-bold ${lastCall ? 'g-sun text-black border-transparent' : 'bg-[var(--card)]'}`}>
@@ -1276,11 +1307,11 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       </div>
 
       {/* LEVEL CARD — the one big moment */}
-      <section className="gloss g-level rounded-[32px] p-6 md:p-8 text-white shadow-[0_24px_48px_-20px_rgba(63,123,230,.45)]" aria-label="This week">
+      <section className="gloss shine-once g-level rounded-[32px] p-6 md:p-8 text-white shadow-[0_24px_48px_-20px_rgba(63,123,230,.45)]" aria-label="This week">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <span className="inline-block rounded-full bg-white/25 px-3 py-1 text-xs font-bold">This week's level</span>
-            <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none flex items-center gap-2.5">{LEVELS[lvl].name}<span className="text-base rounded-full bg-white/25 px-2.5 py-0.5">{LEVELS[lvl].emoji}</span></div>
+            <div className="font-arcade text-3xl md:text-4xl mt-3 leading-none">{LEVELS[lvl].name}</div>
             <div className="mt-4 text-sm font-semibold opacity-80">Your bag so far</div>
             <div className="font-arcade text-6xl md:text-7xl leading-none tabular-nums">{fmtCash(Math.round(bag * 100) / 100)}</div>
           </div>
@@ -1290,7 +1321,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         <div className="mt-6">
           <div className="flex items-center gap-3">
             <div className="flex-1 h-4 rounded-full bg-white/25 overflow-hidden">
-              <div className="h-full rounded-full bg-white transition-[width] duration-700" style={{ width: `${lvlPct}%` }} />
+              <div className="h-full rounded-full bg-white grow-bar" style={{ width: `${lvlPct}%` }} />
             </div>
             <span className="w-11 h-11 rounded-full bg-white/95 border-2 border-white grid place-items-center text-xl shadow-[0_0_0_4px_rgba(255,255,255,.25)]" aria-hidden>{nextLvl ? '🔒' : '👑'}</span>
           </div>
@@ -1361,21 +1392,25 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
       <section aria-label="Rewards">
         <h2 className="font-arcade text-xl mb-1">Rewards to unlock</h2>
         <p className="text-sm text-[var(--text-dim)] mb-3">Extras on top of your weekly cash. Free merch unlocks with your total views, big prizes with one month's views.</p>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pb-2 snap-x">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0 pt-1 pb-4 snap-x">
           {prizes.map((p) => (
-            <div key={p.key} className="snap-start flex-shrink-0 w-[160px] text-center">
-              <div className={`relative overflow-hidden ${p.grad} rounded-[26px] h-[150px] grid place-items-center text-6xl shadow-[0_14px_28px_-14px_rgba(0,0,0,.45)]`}>
+            <button key={p.key} onClick={() => setOpenPrize(p)} className="prize-card snap-start flex-shrink-0 w-[190px] md:w-[200px] text-left rounded-[26px] overflow-hidden bg-[var(--card)] border border-[var(--card-line)]">
+              <div className={`relative ${p.grad} aspect-[4/5]`}>
                 {p.image
-                  ? <img src={p.image} alt={p.label} loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${p.got ? '' : 'saturate-[.9]'}`} />
-                  : <span aria-hidden>{p.emoji}</span>}
+                  ? <img src={p.image} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                  : <span className="absolute inset-0 grid place-items-center text-6xl" aria-hidden>{p.emoji}</span>}
+                <span className="absolute top-2.5 left-2.5 rounded-full bg-black/45 backdrop-blur px-2.5 py-1 text-[11px] font-bold text-white">{p.kind}</span>
+                {p.got && <span className="absolute top-2.5 right-2.5 rounded-full ok-pill px-2.5 py-1 text-[11px] font-bold">Unlocked</span>}
               </div>
-              <div className="font-bold mt-2 leading-tight text-sm">{p.label}</div>
-              <div className="mt-1.5">
-                {p.got
-                  ? <span className="pill-btn ok-pill inline-block">Unlocked ✓</span>
-                  : <span className="pill-btn bg-[var(--elev2)] inline-block">🔒 {p.need}</span>}
+              <div className="p-3.5">
+                <div className="font-bold leading-tight">{p.label}</div>
+                <div className="text-xs text-[var(--text-dim)] mt-1">{p.got ? 'You earned this' : p.need}</div>
+                <div className="mt-2.5 h-2 rounded-full bg-[var(--elev2)] overflow-hidden">
+                  <div className="h-full rounded-full g-blue grow-bar" style={{ width: `${Math.max(p.pct, 3)}%` }} />
+                </div>
+                <div className="text-[11px] font-bold mt-1.5 text-[var(--text-dim)]">{p.pct}%</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -1386,10 +1421,8 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
         {[
           { emoji: '📦', title: 'Free re-up', sub: `Post ${REUP_VIDEOS} videos by ${fmtDay(reup.end)}`, pill: reup.videos >= REUP_VIDEOS ? 'Earned ✓' : `${reup.videos}/${REUP_VIDEOS}`, done: reup.videos >= REUP_VIDEOS },
           { emoji: '😎', title: 'Logo pfp', sub: 'Make the Mad Labs logo your profile pic', pill: `+${fmtCash(LOGO_PFP_BONUS)}/wk`, done: false },
-          { emoji: '💎', title: "This week's cap", sub: `Up to ${fmtCash(WEEKLY_CAP)} this week (${fmtViews(CAP_VIEWS)} views)`, pill: w.capped ? 'Maxed 👑' : `${fmtCash(WEEKLY_CAP - w.pay)} left`, done: w.capped },
-          { emoji: '🤑', title: 'Paid to you', sub: 'All-time, straight to your Cash App', pill: fmtCash(paidTotal), done: false },
         ].map((q) => (
-          <div key={q.title} className="flex items-center gap-3 rounded-[22px] p-3 hover:bg-[var(--elev2)]">
+          <div key={q.title} className="lift flex items-center gap-3 rounded-[22px] p-3 hover:bg-[var(--elev2)]">
             <span className="w-12 h-12 rounded-2xl bg-[var(--elev2)] grid place-items-center text-2xl flex-shrink-0" aria-hidden>{q.emoji}</span>
             <div className="min-w-0 flex-1">
               <div className="font-bold">{q.title}</div>
