@@ -12,6 +12,7 @@ type Creator = {
   phone: string | null; cashapp: string | null
   tiktok_handle: string | null; instagram_handle: string | null
   status: string; created_at: string
+  avatar_url?: string | null
 }
 type Submission = {
   id: string; creator_id: string; video_url: string; platform: string
@@ -703,7 +704,14 @@ export default function AdminPage() {
                 {creators.map((c) => (
                   <tr key={c.id} className={picked[c.id] ? 'row-picked' : ''}>
                     <td><input type="checkbox" className="chk" aria-label={`Select ${c.name}`} checked={!!picked[c.id]} onChange={(e) => setPicked((p) => ({ ...p, [c.id]: e.target.checked }))} /></td>
-                    <td style={{ fontWeight: 600 }}>{c.name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        {c.avatar_url
+                          ? <img src={c.avatar_url} alt="" width={28} height={28} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                          : <span aria-hidden style={{ width: 28, height: 28, borderRadius: '50%', background: '#3F7BE6', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>{(c.name || '?').trim().charAt(0).toUpperCase()}</span>}
+                        {c.name}
+                      </span>
+                    </td>
                     <td className="muted">{c.email}</td>
                     <td>{c.phone || '—'}</td>
                     <td>{c.cashapp || '—'}</td>

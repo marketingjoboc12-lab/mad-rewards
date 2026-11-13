@@ -65,6 +65,7 @@ const mapCreatorRow = (r) => ({
   status: r.status,
   joined: r.created_at,
   rulesAccepted: !!r.rules_accepted_at && r.rules_accepted_at >= RULES_UPDATED,
+  avatar: r.avatar_url || null,
 });
 
 // Shape the reward math in lib/rewards.ts expects.
@@ -872,8 +873,73 @@ const RequestPage = ({ go, onSubmit }) => {
   );
 };
 
-const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children }) => {
+// Round profile picture, or the creator's first initial when there isn't one.
+const Avatar = ({ src, name, size = 32, className = '' }) => (
+  src
+    ? <img src={src} alt="" width={size} height={size} draggable={false} className={`rounded-full object-cover flex-shrink-0 bg-[var(--elev2)] ${className}`} style={{ width: size, height: size }} />
+    : <span aria-hidden className={`rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white g-blue ${className}`} style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>{(String(name || '?').trim()[0] || '?').toUpperCase()}</span>
+);
+
+// Center-crop to a square and shrink to 400px JPEG before upload (small file, no photo metadata).
+const makeAvatarJpeg = (file) => new Promise((resolve, reject) => {
+  if (!/^image\//.test(file?.type || '')) { reject(new Error('Pick a photo (JPG, PNG or WebP).')); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const out = 400;
+    const c = document.createElement('canvas');
+    c.width = out; c.height = out;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+    URL.revokeObjectURL(url);
+    c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not read that photo.'))), 'image/jpeg', 0.88);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that photo. Try a JPG or PNG.')); };
+  img.src = url;
+});
+
+const ProfilePicModal = ({ user, onSave, onRemove, onClose }) => {
+  const input = useRef(null);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const run = async (kind, fn) => {
+    setBusy(kind); setError('');
+    try { await fn(); onClose(); } catch (e) { setError(e?.message || 'Something went wrong. Try again.'); }
+    finally { setBusy(''); }
+  };
+  const pick = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (f) run('save', () => onSave(f));
+  };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-6" onClick={() => !busy && onClose()}>
+      <div className="stk w-full sm:max-w-sm p-6 text-center rounded-b-none sm:rounded-[24px] bg-[var(--bg)] pop-in" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Profile picture">
+        <div className="flex justify-end -mt-2 -mr-2">
+          <button onClick={onClose} disabled={!!busy} className="w-9 h-9 rounded-full bg-[var(--elev2)] flex items-center justify-center" aria-label="Close"><X size={16} /></button>
+        </div>
+        <Avatar src={user.avatar} name={user.name} size={112} className="mx-auto" />
+        <h2 className="font-arcade text-2xl mt-4">Profile picture</h2>
+        <p className="text-sm text-[var(--text-dim)] mt-1">Shows on your account and the leaderboard.</p>
+        <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pick} />
+        <button onClick={() => input.current?.click()} disabled={!!busy} className="stk-btn mt-5 w-full h-13 py-3.5 font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+          <Upload size={16} /> {busy === 'save' ? 'Uploading…' : user.avatar ? 'Change picture' : 'Upload a picture'}
+        </button>
+        {user.avatar && (
+          <button onClick={() => run('remove', onRemove)} disabled={!!busy} className="mt-3 w-full h-11 rounded-2xl text-sm font-semibold text-[var(--danger)] hover:bg-[var(--elev1)] disabled:opacity-50">
+            {busy === 'remove' ? 'Removing…' : 'Remove picture'}
+          </button>
+        )}
+        {error && <p className="mt-3 text-xs text-[var(--danger)]">{error}</p>}
+      </div>
+    </div>
+  );
+};
+
+const CreatorShell = ({ user, view, setView, onLogout, onAvatarSave, onAvatarRemove, theme, setTheme, children }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [picOpen, setPicOpen] = useState(false);
   const tabs = [
     { k: 'dash',    label: 'Home',      icon: BarChart3 },
     { k: 'drop',    label: 'Drop videos', icon: Upload },
@@ -904,7 +970,10 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle theme={theme} setTheme={setTheme} />
-            <div className="hidden md:flex items-center gap-3 pl-4 pr-1.5 h-10 rounded-full bg-[var(--elev1)] border border-[var(--border)]">
+            <div className="hidden md:flex items-center gap-3 pl-1.5 pr-1.5 h-10 rounded-full bg-[var(--elev1)] border border-[var(--border)]">
+              <button onClick={() => setPicOpen(true)} className="rounded-full hover:ring-2 hover:ring-[var(--accent)]" title="Profile picture" aria-label="Change profile picture">
+                <Avatar src={user.avatar} name={user.name} size={28} />
+              </button>
               <span className="text-xs">
                 <span className="text-[var(--text-dim)]">Hi, </span>
                 <span className="font-semibold text-[var(--text)]">{user.name.split(' ')[0]}</span>
@@ -932,6 +1001,10 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
                 {t.label}
               </button>
             ))}
+            <button onClick={() => { setPicOpen(true); setMenuOpen(false); }} className="w-full h-12 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 text-[var(--text-dim)]">
+              <Avatar src={user.avatar} name={user.name} size={22} />
+              Profile picture
+            </button>
             <button onClick={() => { onLogout(); setMenuOpen(false); }} className="w-full h-12 px-4 rounded-2xl text-sm font-semibold flex items-center gap-3 text-[var(--danger)]">
               <LogOut size={15} strokeWidth={2.4} />
               Log out
@@ -944,6 +1017,7 @@ const CreatorShell = ({ user, view, setView, onLogout, theme, setTheme, children
         {children}
       </main>
       <Watermark user={user} />
+      {picOpen && <ProfilePicModal user={user} onSave={onAvatarSave} onRemove={onAvatarRemove} onClose={() => setPicOpen(false)} />}
     </div>
   );
 };
@@ -1398,6 +1472,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
                 <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#3F7BE6]/10' : ''}`}>
                   <span className={`rank ${rankBg[i]}`}>{r.rank}</span>
                   <span className="text-2xl" aria-hidden>{medal[i]}</span>
+                  <Avatar src={r.avatar} name={r.name} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="font-bold truncate">{r.name}{r.me && ' (you)'}</div>
                     {r.handle && <div className="text-xs text-[var(--text-dim)] truncate">{r.handle}</div>}
@@ -1411,6 +1486,7 @@ const CreatorDashboard = ({ user, deal, submissions, payouts, onSubmit, setView 
                 {rest.map((r) => (
                   <div key={r.rank} className={`flex items-center gap-3 rounded-2xl p-2.5 ${r.me ? 'bg-[#3F7BE6]/10' : ''}`}>
                     <span className="rank bg-[var(--elev2)]">{r.rank}</span>
+                    <Avatar src={r.avatar} name={r.name} size={28} />
                     <div className="min-w-0 flex-1 font-semibold truncate">{r.name}{r.me && ' (you)'}</div>
                     <div className="font-bold text-sm">{fmtViews(r.views)}</div>
                   </div>
@@ -1758,8 +1834,28 @@ const IdeasPage = ({ deal, setView }) => {
   );
 };
 
-const SubmissionRow = ({ sub }) => {
+// Creators can change the views on a pending video until its week closes
+// (end of the Sunday grace day after the Sun–Sat week it was posted in).
+const canEditViews = (sub, today = todayLocal()) =>
+  sub.status === 'pending' && today <= addDays(weekStart(sub.posted), 7);
+
+const SubmissionRow = ({ sub, onEditViews }) => {
   const verified = sub.status === 'approved' || sub.status === 'paid';
+  const editable = !!onEditViews && canEditViews(sub);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const open = () => { setVal(String(sub.claimedViews || '')); setErr(''); setEditing(true); };
+  const save = async (e) => {
+    e.preventDefault();
+    const n = parseViews(val);
+    if (!(n > 0)) { setErr('Add the views.'); return; }
+    setBusy(true); setErr('');
+    try { await onEditViews(sub.id, n); setEditing(false); }
+    catch (e2) { setErr(e2?.message || 'Could not save. Try again.'); }
+    finally { setBusy(false); }
+  };
   return (
     <div className="stk rounded-[24px] p-4 md:p-5">
       <div className="flex items-start gap-4">
@@ -1779,7 +1875,24 @@ const SubmissionRow = ({ sub }) => {
           </div>
           <div className="flex items-center gap-3 mt-2.5 text-xs text-[var(--text-dim)]">
             <span>{Number(verified ? sub.views : sub.claimedViews).toLocaleString()} views {verified ? '· verified' : '· your count'}</span>
+            {editable && !editing && (
+              <button type="button" onClick={open} className="flex items-center gap-1 font-semibold text-[var(--accent)] hover:underline">
+                <Edit3 size={12} /> Edit views
+              </button>
+            )}
           </div>
+          {editing && (
+            <form onSubmit={save} className="mt-3 flex flex-wrap items-center gap-2">
+              <label htmlFor={`edit-views-${sub.id}`} className="sr-only">Views right now</label>
+              <input id={`edit-views-${sub.id}`} autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder="48200, 400k, 1.2m" inputMode="decimal" className={inputCls.replace('w-full h-12', 'w-[180px] h-10')} />
+              <button type="submit" disabled={busy} className="stk-btn h-10 px-4 text-sm font-bold disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={() => setEditing(false)} disabled={busy} className="h-10 px-3 text-sm font-semibold text-[var(--text-dim)] hover:text-[var(--text)]">Cancel</button>
+              {err && <p className="basis-full text-xs text-[var(--danger)]">{err}</p>}
+            </form>
+          )}
+          {editable && !editing && (
+            <p className="mt-1.5 text-[11px] text-[var(--text-faint)]">You can update this until {fmtDay(addDays(weekStart(sub.posted), 7))} 11:59pm.</p>
+          )}
         </div>
       </div>
     </div>
@@ -1798,7 +1911,7 @@ const CreatorRewards = () => (
   </div>
 );
 
-const CreatorHistory = ({ submissions }) => {
+const CreatorHistory = ({ submissions, onEditViews }) => {
   const [filter, setFilter] = useState('all');
   const mine = submissions;
   const filtered = filter === 'all' ? mine : mine.filter((s) => s.status === filter);
@@ -1835,7 +1948,7 @@ const CreatorHistory = ({ submissions }) => {
         </Card>
       ) : (
         <div className="space-y-2.5 anim-fade-up anim-d-200">
-          {filtered.map((s) => <SubmissionRow key={s.id} sub={s} />)}
+          {filtered.map((s) => <SubmissionRow key={s.id} sub={s} onEditViews={onEditViews} />)}
         </div>
       )}
     </div>
@@ -2023,6 +2136,43 @@ const App = () => {
     await loadMine(user.id);
   };
 
+  // Profile picture: shrink, upload to avatars/<id>/, save the link, then clear older files.
+  const handleAvatarSave = async (file) => {
+    const blob = await makeAvatarJpeg(file);
+    const path = `${user.id}/${Date.now()}.jpg`;
+    const bucket = supabase.storage.from('avatars');
+    const up = await bucket.upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if (up.error) throw new Error(/bucket not found/i.test(up.error.message) ? 'Profile pictures are not switched on yet. Ask the Mad Labs team.' : friendlyError(up.error));
+    const url = bucket.getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.rpc('set_my_avatar', { p_url: url });
+    if (error) { await bucket.remove([path]); throw new Error(error.message || friendlyError(error)); }
+    setUser((u) => ({ ...u, avatar: url }));
+    const { data: old } = await bucket.list(user.id);
+    const stale = (old || []).map((f) => `${user.id}/${f.name}`).filter((n) => n !== path);
+    if (stale.length) await bucket.remove(stale);
+  };
+  const handleAvatarRemove = async () => {
+    const { error } = await supabase.rpc('set_my_avatar', { p_url: null });
+    if (error) throw new Error(error.message || friendlyError(error));
+    setUser((u) => ({ ...u, avatar: null }));
+    const bucket = supabase.storage.from('avatars');
+    const { data: old } = await bucket.list(user.id);
+    if (old?.length) await bucket.remove(old.map((f) => `${user.id}/${f.name}`));
+  };
+
+  // Creator changes the views on a pending video (checks run in the database).
+  const handleEditViews = async (id, views) => {
+    let error;
+    try {
+      ({ error } = await supabase.rpc('update_my_views', { p_id: id, p_views: views }));
+    } catch (e) {
+      throw new Error(friendlyError(e));
+    }
+    if (error?.code === 'PGRST202') throw new Error('Editing views is not switched on yet. Ask the Mad Labs team.');
+    if (error) throw new Error(error.message || friendlyError(error));
+    await loadMine(user.id);
+  };
+
   const go = (v) => setView(v);
 
   // Logged-in creator pages: blur when focus leaves, no copying.
@@ -2047,13 +2197,13 @@ const App = () => {
     body = <RequestPage go={go} onSubmit={submitRequest} />;
   } else if (user) {
     body = (
-      <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} theme={theme} setTheme={setTheme}>
+      <CreatorShell user={user} view={view} setView={setView} onLogout={handleLogout} onAvatarSave={handleAvatarSave} onAvatarRemove={handleAvatarRemove} theme={theme} setTheme={setTheme}>
         {view === 'dash'    && <CreatorDashboard user={user} deal={deal} submissions={submissions} payouts={payouts} onSubmit={handleNewSubmission} setView={setView} />}
         {view === 'drop'    && <DropPage submissions={submissions} onSubmit={handleNewSubmission} setView={setView} />}
         {view === 'ideas'   && <IdeasPage deal={deal} setView={setView} />}
         {view === 'rewards' && <CreatorRewards />}
         {view === 'contact' && <ContactPage user={user} setView={setView} />}
-        {view === 'history' && <CreatorHistory submissions={submissions} />}
+        {view === 'history' && <CreatorHistory submissions={submissions} onEditViews={handleEditViews} />}
         {!user.rulesAccepted && <RulesGate user={user} onAccept={acceptRules} />}
       </CreatorShell>
     );

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   const start = weekStart(todayLocal())
   const end = addDays(start, 6)
   const [creators, subs] = await Promise.all([
-    admin.from('creators').select('id, name, tiktok_handle'),
+    admin.from('creators').select('*'),
     admin.from('video_submissions').select('creator_id, status, views, claimed_views, posted_at')
       .gte('posted_at', start).lte('posted_at', end + 'T23:59:59'),
   ])
@@ -40,10 +40,11 @@ export async function GET(req: Request) {
       id: c.id,
       name: (c.name || 'Creator').trim().split(/\s+/)[0],
       handle: c.tiktok_handle || null,
+      avatar: c.avatar_url || null,
       views: views.get(c.id) || 0,
     }))
     .sort((a, b) => b.views - a.views)
-    .map((r, i) => ({ rank: i + 1, name: r.name, handle: r.handle, views: r.views, me: r.id === me.data.user!.id }))
+    .map((r, i) => ({ rank: i + 1, name: r.name, handle: r.handle, avatar: r.avatar, views: r.views, me: r.id === me.data.user!.id }))
 
   return NextResponse.json({ week: start, rows })
 }
